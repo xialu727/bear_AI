@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>小熊AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .chat-container {
+            width: 900px;
+            height: 800px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(139, 92, 246, 0.2);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+
+        .big-strawberry-bear {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 480px;
+            opacity: 0.07;
+            color: #ec4899;
+            z-index: 0;
+            animation: float 12s ease-in-out infinite;
+            filter: hue-rotate(300deg) saturate(200%);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+            50% { transform: translate(-50%, -55%) rotate(5deg); }
+        }
+
+        .header {
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+            color: white;
+            padding: 28px;
+            text-align: center;
+            font-size: 32px;
+            font-weight: 700;
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer { 100% { left: 100%; } }
+
+        .header-strawberry-bear {
+            font-size: 32px;
+            margin-right: 12px;
+            filter: hue-rotate(300deg) saturate(50%);
+        }
+
+        .chat-box {
+            height: 580px;
+            border: 1px solid rgba(139, 92, 246, 0.1);
+            padding: 24px;
+            overflow-y: auto;
+            background: linear-gradient(135deg, rgba(168, 237, 234, 0.05) 0%, rgba(254, 214, 227, 0.05) 100%);
+            position: relative;
+            z-index: 1;
+        }
+
+        .user-msg, .ai-msg {
+            margin: 16px 0;
+            font-weight: 500;
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        .user-msg {
+            text-align: right;
+        }
+
+        .user-msg::before { content: "你: "; color: #8b5cf6; font-weight: bold; }
+
+        .ai-msg {
+            color: #333;
+            position: relative;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%);
+            padding: 20px;
+            border-radius: 16px;
+            border-left: 4px solid #8b5cf6;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
+            animation: slideInLeft 0.3s ease-out;
+        }
+
+        .ai-msg::before { content: "AI助手: "; color: #8b5cf6; font-weight: bold; }
+
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .msg-actions {
+            display: flex;
+            justify-content: flex-start;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #aaa;
+            transition: all 0.3s ease;
+            padding: 6px 10px;
+            border-radius: 8px;
+        }
+
+        .action-btn:hover {
+            color: #8b5cf6;
+            background: rgba(139, 92, 246, 0.1);
+            transform: scale(1.1);
+        }
+
+        .input-area {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.98);
+            position: relative;
+            z-index: 1;
+        }
+
+        #input {
+            flex: 1;
+            padding: 16px 24px;
+            border: 2px solid rgba(139, 92, 246, 0.2);
+            border-radius: 30px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        #input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1), inset 0 2px 8px rgba(0, 0, 0, 0.05);
+            transform: translateY(-1px);
+        }
+
+        .btn-group { display: flex; gap: 12px; align-items: center; }
+
+        #send, #stop, #regenerate {
+            padding: 0 28px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.3);
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #stop, #regenerate {
+            padding: 0 16px;
+            font-size: 20px;
+            width: 52px;
+        }
+
+        #send:hover, #stop:hover, #regenerate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+        }
+
+        #stop {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        #stop:hover { box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4); }
+
+        .ai-msg-content { line-height: 1.7; color: #4b5563; }
+
+        .ai-msg-content pre {
+            background: linear-gradient(135deg, #2d2d2d 0%, #3d3d3d 100%);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 16px 0;
+            position: relative;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        .ai-msg-content code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: rgba(139, 92, 246, 0.1);
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            color: #8b5cf6;
+        }
+
+        .ai-msg-content pre code {
+            background: transparent;
+            padding: 0;
+            border: none;
+            color: #e5e7eb;
+        }
+
+        .ai-msg-content h1, .ai-msg-content h2, .ai-msg-content h3 {
+            margin: 24px 0 16px 0;
+            color: #8b5cf6;
+            font-weight: 700;
+        }
+
+        .copy-code-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            opacity: 0.7;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .copy-code-btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.3); transform: translateY(-1px); }
+        .copy-code-btn.copied { background: rgba(34, 197, 94, 0.8); }
+
+        .chat-box::-webkit-scrollbar { width: 8px; }
+        .chat-box::-webkit-scrollbar-track { background: rgba(139, 92, 246, 0.1); border-radius: 4px; }
+        .chat-box::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #8b5cf6 0%, #ec4899 100%); border-radius: 4px; }
+
+        @media (max-width: 768px) {
+            .chat-container { width: 100%; height: 100vh; border-radius: 0; }
+            .big-strawberry-bear { font-size: 300px; opacity: 0.05; }
+            .header { padding: 20px; font-size: 24px; }
+            .header-strawberry-bear { font-size: 24px; }
+            .chat-box { padding: 16px; }
+            .input-area { padding: 16px; gap: 8px; }
+            #send { padding: 0 20px; font-size: 14px; }
+        }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js/lib/index.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/atom-one-dark.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="big-strawberry-bear">🐻</div>
+        <div class="header">
+            <span class="header-strawberry-bear">🐻</span>小熊AI
+        </div>
+        <div class="chat-box" id="chatBox"></div>
+        <div class="input-area">
+            <input id="input" placeholder="请输入您的问题...">
+            <div class="btn-group">
+                <button id="send" onclick="send()">发送</button>
+                <button id="stop" onclick="stopGeneration()" style="display: none;">⏹</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        marked.setOptions({
+            highlight: (code, lang) => {
+                const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                return hljs.highlight(code, { language }).value;
+            },
+            langPrefix: 'hljs language-'
+        });
+
+        const socket = io('http://localhost:5000');
+        const chatBox = document.getElementById('chatBox');
+        const input = document.getElementById('input');
+        const sendBtn = document.getElementById('send');
+        const stopBtn = document.getElementById('stop');
+
+        let lastQuestion = null, isGenerating = false, fullResponse = "";
+
+        // 使用事件委托处理所有复制按钮的点击事件
+        chatBox.addEventListener('click', function(e) {
+            const copyBtn = e.target.closest('.action-btn[title="复制回答"]');
+            if (copyBtn) {
+                const msgDiv = copyBtn.closest('.ai-msg');
+                const contentDiv = msgDiv ? msgDiv.querySelector('.ai-msg-content') : null;
+                if (contentDiv) {
+                    const answerText = contentDiv.textContent;
+                    navigator.clipboard.writeText(answerText).then(() => {
+                        copyBtn.innerHTML = '✅';
+                        setTimeout(() => copyBtn.innerHTML = '📋', 1000);
+                    }).catch(err => {
+                        console.error('复制失败:', err);
+                    });
+                }
+            }
+
+            // 处理重新生成按钮 - 历史对话禁用
+            const regenerateMsgBtn = e.target.closest('.action-btn[title="重新生成"]');
+            if (regenerateMsgBtn) {
+                // 检查是否是最后一条消息
+                const allAiMsgs = chatBox.querySelectorAll('.ai-msg');
+                const msgDiv = regenerateMsgBtn.closest('.ai-msg');
+                const isLastMsg = msgDiv === allAiMsgs[allAiMsgs.length - 1];
+                
+                // 只有最后一条消息才能重新生成
+                if (isLastMsg && lastQuestion) {
+                    msgDiv.querySelector('.ai-msg-content').innerHTML = '';
+                    sendBtn.style.display = 'none';
+                    stopBtn.style.display = 'inline-block';
+                    isGenerating = true;
+                    fullResponse = "";
+                    socket.emit('ask_ai', { message: lastQuestion });
+                }
+                // 历史消息不响应
+            }
+        });
+
+        function send() {
+            const text = input.value.trim();
+            if (!text) return;
+
+            lastQuestion = text;
+            chatBox.innerHTML += `<div class="user-msg">${text}</div>`;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-msg';
+
+            const msgActions = document.createElement('div');
+            msgActions.className = 'msg-actions';
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'action-btn';
+            copyBtn.innerHTML = '📋';
+            copyBtn.title = '复制回答';
+            msgActions.appendChild(copyBtn);
+
+            const regenerateMsgBtn = document.createElement('button');
+            regenerateMsgBtn.className = 'action-btn';
+            regenerateMsgBtn.innerHTML = '🔄';
+            regenerateMsgBtn.title = '重新生成';
+            msgActions.appendChild(regenerateMsgBtn);
+
+            const answerContent = document.createElement('div');
+            answerContent.className = 'ai-msg-content';
+
+            aiMsg.appendChild(answerContent);
+            aiMsg.appendChild(msgActions);
+            
+            // 存储引用以便后续使用
+            aiMsg._answerContent = answerContent;
+            chatBox.appendChild(aiMsg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            sendBtn.style.display = 'none';
+            stopBtn.style.display = 'inline-block';
+            isGenerating = true;
+            fullResponse = "";
+
+            socket.off('ai_response');
+
+            socket.on('ai_response', (data) => {
+                const content = data.content;
+                if (content === '[DONE]') {
+                    sendBtn.style.display = 'inline-block';
+                    stopBtn.style.display = 'none';
+                    isGenerating = false;
+                    addCopyButtons();
+                    return;
+                }
+                const rawContent = content.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+                fullResponse += rawContent;
+                aiMsg.querySelector('.ai-msg-content').innerHTML = marked.parse(fullResponse);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
+
+            socket.emit('ask_ai', { message: text });
+        }
+
+        function addCopyButtons() {
+            document.querySelectorAll('pre code').forEach(codeBlock => {
+                if (codeBlock.parentNode.querySelector('.copy-code-btn')) return;
+                const button = document.createElement('button');
+                button.className = 'copy-code-btn';
+                button.textContent = '复制';
+                button.addEventListener('click', () => {
+                    navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+                        button.textContent = '已复制';
+                        button.classList.add('copied');
+                        setTimeout(() => {
+                            button.textContent = '复制';
+                            button.classList.remove('copied');
+                        }, 2000);
+                    });
+                });
+                codeBlock.parentNode.style.position = 'relative';
+                codeBlock.parentNode.appendChild(button);
+            });
+        }
+
+        function stopGeneration() {
+            socket.emit('stop_generation');
+            sendBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
+            isGenerating = false;
+        }
+
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') send();
+        });
+    </script>
+</body>
+</html>
