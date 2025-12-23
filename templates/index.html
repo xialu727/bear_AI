@@ -289,10 +289,10 @@
         }
     </style>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/highlight.js/lib/index.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/atom-one-dark.css">
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdn.bootcdn.net/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
     <div class="chat-container">
@@ -319,13 +319,32 @@
             langPrefix: 'hljs language-'
         });
 
-        const socket = io('http://localhost:5000');
+        const socket = io('http://10.205.15.183:5000');
         const chatBox = document.getElementById('chatBox');
         const input = document.getElementById('input');
         const sendBtn = document.getElementById('send');
         const stopBtn = document.getElementById('stop');
 
         let lastQuestion = null, isGenerating = false, fullResponse = "";
+
+        // 统一使用 execCommand 复制方法，兼容所有环境
+        function copyToClipboard(text, callback) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                if (callback) callback();
+            } catch (err) {
+                console.error('复制失败:', err);
+            }
+            document.body.removeChild(textArea);
+        }
 
         // 使用事件委托处理所有复制按钮的点击事件
         chatBox.addEventListener('click', function(e) {
@@ -335,11 +354,9 @@
                 const contentDiv = msgDiv ? msgDiv.querySelector('.ai-msg-content') : null;
                 if (contentDiv) {
                     const answerText = contentDiv.textContent;
-                    navigator.clipboard.writeText(answerText).then(() => {
+                    copyToClipboard(answerText, () => {
                         copyBtn.innerHTML = '✅';
                         setTimeout(() => copyBtn.innerHTML = '📋', 1000);
-                    }).catch(err => {
-                        console.error('复制失败:', err);
                     });
                 }
             }
@@ -351,7 +368,7 @@
                 const allAiMsgs = chatBox.querySelectorAll('.ai-msg');
                 const msgDiv = regenerateMsgBtn.closest('.ai-msg');
                 const isLastMsg = msgDiv === allAiMsgs[allAiMsgs.length - 1];
-                
+
                 // 只有最后一条消息才能重新生成
                 if (isLastMsg && lastQuestion) {
                     msgDiv.querySelector('.ai-msg-content').innerHTML = '';
@@ -397,7 +414,7 @@
 
             aiMsg.appendChild(answerContent);
             aiMsg.appendChild(msgActions);
-            
+
             // 存储引用以便后续使用
             aiMsg._answerContent = answerContent;
             chatBox.appendChild(aiMsg);
@@ -435,7 +452,7 @@
                 button.className = 'copy-code-btn';
                 button.textContent = '复制';
                 button.addEventListener('click', () => {
-                    navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+                    copyToClipboard(codeBlock.textContent, () => {
                         button.textContent = '已复制';
                         button.classList.add('copied');
                         setTimeout(() => {
