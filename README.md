@@ -116,7 +116,7 @@ if len(user_histories[user_id]) > 10:
 ## 🎨 界面预览
 
 ![小熊AI助手界面](screenshot.png)
-
+![复制和暂停](223.png)
 ### 界面特色
 
 - 🎨 渐变背景设计
