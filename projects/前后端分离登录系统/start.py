@@ -6,9 +6,11 @@ import webbrowser
 from pathlib import Path
 
 # 临时写死你的项目目录
-BASE_DIR = Path(r"C:\Users\30599\Desktop\python_ai_bot\projects\前后端分离登录系统")
+BASE_DIR = Path(__file__).resolve().parent
 BACKEND_FILE = BASE_DIR / "backend.py"
 FRONTEND_DIR = BASE_DIR
+
+
 
 
 BACKEND_PORT = 5001

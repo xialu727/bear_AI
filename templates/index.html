@@ -657,6 +657,37 @@
             background: rgba(251, 191, 36, 0.8);
         }
 
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+            z-index: 10000;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%);
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+
         .ai-msg-content code {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             background: rgba(139, 92, 246, 0.1);
@@ -702,6 +733,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
 </head>
 <body>
+    <div id="toast" class="toast"></div>
     <div class="file-manager-container">
         <div class="file-sidebar">
             <div class="sidebar-header">
@@ -774,7 +806,7 @@
         });
 
         // Socket.IO连接
-        const socket = io('http://localhost:5000', {
+        const socket = io(window.location.origin, {
             transports: ['websocket', 'polling'],
             reconnection: true,
             reconnectionAttempts: 5,
@@ -787,11 +819,15 @@
 
         // 全局变量
         let lastQuestion = null, isGenerating = false, fullResponse = "";
-        let projects = [], currentProjectId = null, currentFileId = null;
+        let projects = [], currentProjectId = null, currentFileId = null, currentFileData = null;
         let editor = null, editorMode = false;
         
         // 任务管理：按任务实例管理执行状态
         const runningTasks = {};
+        
+        // 按文件管理的运行状态
+        const runningByFile = {};  // filePath -> executionId
+        const taskMeta = {};        // executionId -> { filePath, runBtn, runMode, source }
         
         // 服务管理
         const runningServices = {};
@@ -1010,6 +1046,7 @@
         function showEditor(fileData) {
             editorMode = true;
             currentFileId = fileData.id;
+            currentFileData = fileData;
 
             domElements.welcomeMessage.style.display = 'none';
             domElements.editorContainer.style.display = 'flex';
@@ -1025,6 +1062,30 @@
                 };
                 const ext = fileData.filename.split('.').pop().toLowerCase();
                 monaco.editor.setModelLanguage(editor.getModel(), langMap[ext] || 'plaintext');
+            }
+            
+            // 刷新运行按钮状态
+            refreshRunButtonState();
+        }
+
+        /**
+         * 刷新运行按钮状态（根据当前文件）
+         */
+        function refreshRunButtonState() {
+            const runBtn = document.querySelector('.run-editor-btn');
+            if (!runBtn) return;
+            
+            const filePath = currentFileData && currentFileData.file_path ? currentFileData.file_path : '';
+            const executionId = runningByFile[filePath];
+            
+            if (executionId && runningTasks[executionId]) {
+                // 当前文件正在运行
+                runBtn.classList.add('running');
+                runBtn.innerHTML = '⏹ 停止';
+            } else {
+                // 当前文件未运行
+                runBtn.classList.remove('running');
+                runBtn.innerHTML = '▶ 运行';
             }
         }
 
@@ -1097,7 +1158,7 @@
          * 保存当前文件
          */
         async function saveCurrentFile() {
-            if (!currentFileId || !editor) return;
+            if (!currentFileId || !editor) return false;
 
             const saveBtn = document.querySelector('.save-btn');
             saveBtn.classList.add('saving');
@@ -1119,13 +1180,19 @@
 
                 const result = await response.json();
                 if (response.ok) {
-                    alert('保存成功！');
+                    if (!currentFileData) currentFileData = {};
+                    currentFileData.file_path = result.file_path;
+                    currentFileData.filename = document.getElementById('editorFileName').textContent;
+                    showToast('✅ 保存成功！', 'success');
+                    return true;
                 } else {
-                    alert('保存失败：' + result.error);
+                    showToast('保存失败：' + result.error, 'error');
+                    return false;
                 }
             } catch (error) {
                 console.error('保存失败:', error);
-                alert('保存失败：' + error.message);
+                showToast('保存失败：' + error.message, 'error');
+                return false;
             } finally {
                 saveBtn.classList.remove('saving');
                 saveBtn.innerHTML = '💾 保存';
@@ -1137,8 +1204,9 @@
          * @param {string} code - 代码内容
          * @param {string} language - 语言类型
          * @param {HTMLElement} runBtn - 运行按钮（可选）
+         * @param {string} filePath - 文件路径（可选，用于按文件管理状态）
          */
-        async function runCode(code, language, runBtn = null) {
+        async function runCode(code, language, runBtn = null, filePath = null) {
             if (runBtn) {
                 runBtn.classList.add('running');
                 runBtn.innerHTML = '⏹ 停止';
@@ -1208,6 +1276,17 @@
                             isRunning: true,
                             isWebService: result.is_web_service === true
                         };
+                        
+                        // 使用传入的 filePath，如果没有则使用当前文件路径或 snippet 标识符
+                        const actualFilePath = filePath || (currentFileData && currentFileData.file_path ? currentFileData.file_path : '__snippet__');
+                        runningByFile[actualFilePath] = executionId;
+                        taskMeta[executionId] = {
+                            filePath: actualFilePath,
+                            runBtn: runBtn,
+                            runMode: 'snippet',
+                            source: runBtn && runBtn.classList.contains('code-run-btn') ? 'chat' : 'editor'
+                        };
+                        
                         pollOutput(executionId);
                     }
                 } else {
@@ -1260,7 +1339,12 @@
                             task.runBtn.classList.remove('running');
                             task.runBtn.innerHTML = '▶ 运行';
                         }
-                        // 清理任务
+                        // 清理任务和文件映射
+                        const meta = taskMeta[executionId];
+                        if (meta && meta.filePath) {
+                            delete runningByFile[meta.filePath];
+                        }
+                        delete taskMeta[executionId];
                         delete runningTasks[executionId];
                     } else {
                         // 检查是否需要输入
@@ -1337,7 +1421,12 @@
                         runBtn.classList.remove('running');
                         runBtn.innerHTML = '▶ 运行';
                     }
-                    // 清理任务
+                    // 清理任务和文件映射
+                    const meta = taskMeta[executionId];
+                    if (meta && meta.filePath) {
+                        delete runningByFile[meta.filePath];
+                    }
+                    delete taskMeta[executionId];
                     delete runningTasks[executionId];
                 } else {
                     addTerminalLog(`❌ 停止失败：${result.error}`, 'error');
@@ -1357,25 +1446,20 @@
             }
 
             const runBtn = document.querySelector('.run-editor-btn');
+            if (!runBtn) return;
             
-            // 检查是否有正在运行的任务
-            if (runBtn.classList.contains('running')) {
-                // 查找当前编辑器对应的执行ID
-                let editorExecutionId = null;
-                for (const [execId, task] of Object.entries(runningTasks)) {
-                    if (task.runBtn === runBtn) {
-                        editorExecutionId = execId;
-                        break;
-                    }
-                }
-                
-                if (editorExecutionId) {
-                    await stopRunningCode(runBtn, editorExecutionId);
-                }
+            // 获取当前文件路径
+            const filePath = currentFileData && currentFileData.file_path ? currentFileData.file_path : '';
+            
+            // 检查当前文件是否正在运行
+            const executionId = runningByFile[filePath];
+            
+            if (executionId && runningTasks[executionId]) {
+                // 停止当前文件的任务
+                await stopRunningCode(runBtn, executionId);
                 return;
             }
 
-            const code = editor.getValue();
             const filename = domElements.editorFileName.textContent;
 
             if (!filename || filename === '未选择文件') {
@@ -1391,11 +1475,109 @@
             } else if (ext === 'js') {
                 language = 'javascript';
             } else {
-                addTerminalLog('⚠️ 不支持的文件类型，仅支持.py和.js文件！', 'info');
+                addTerminalLog('⚠️ 不支持的文件类型，仅支持 .py 和 .js', 'info');
                 return;
             }
 
-            await runCode(code, language, runBtn);
+            const currentProject = projects.find(p => p.id === currentProjectId);
+            const scriptPath = currentFileData && currentFileData.file_path ? currentFileData.file_path : '';
+
+            // 先只对 Python 文件启用 project 模式
+            const canUseProjectMode = (
+                language === 'python' &&
+                currentProject &&
+                currentProject.root_path &&
+                scriptPath
+            );
+
+            if (canUseProjectMode) {
+                const saved = await saveCurrentFile();
+                if (!saved) {
+                    addTerminalLog('❌ 保存失败，已取消运行', 'error');
+                    return;
+                }
+                await runProjectFile(scriptPath, currentProject.root_path, currentProject.id, runBtn);
+            } else {
+                const code = editor.getValue();
+                await runCode(code, language, runBtn);
+            }
+        }
+
+        /**
+         * 运行项目文件（project模式）
+         */
+        async function runProjectFile(scriptPath, cwd, projectId, runBtn) {
+            if (runBtn) {
+                runBtn.classList.add('running');
+                runBtn.innerHTML = '⏹ 停止';
+            }
+
+            const filename = scriptPath.split(/[/\\]/).pop();
+            addTerminalLog(`▶ 运行项目文件：${filename}`, 'info');
+            addTerminalLog(`📁 工作目录：${cwd}`, 'info');
+
+            try {
+                const response = await fetch('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        run_mode: 'project',
+                        script_path: scriptPath,
+                        cwd: cwd,
+                        project_id: projectId,
+                        source: 'editor'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    const executionId = result.execution_id;
+                    
+                    if (result.output) {
+                        addTerminalLog(result.output, 'success');
+                        
+                        // 如果是Web服务，显示访问地址
+                        if (result.is_web_service === true && result.service_url) {
+                            addTerminalLog('🌐 Web服务已启动，请使用浏览器访问：' + result.service_url, 'info');
+                        }
+                    }
+                    
+                    // 开始轮询输出
+                    if (result.running === true && executionId) {
+                        // 创建任务实例
+                        runningTasks[executionId] = {
+                            runBtn: runBtn,
+                            isRunning: true,
+                            isWebService: result.is_web_service === true,
+                            runMode: 'project'
+                        };
+                        
+                        // 添加到文件映射
+                        runningByFile[scriptPath] = executionId;
+                        taskMeta[executionId] = {
+                            filePath: scriptPath,
+                            runBtn: runBtn,
+                            runMode: 'project',
+                            source: 'editor'
+                        };
+                        
+                        pollOutput(executionId);
+                    }
+                } else {
+                    addTerminalLog(`❌ 错误：${result.error}`, 'error');
+                    if (runBtn) {
+                        runBtn.classList.remove('running');
+                        runBtn.innerHTML = '▶ 运行';
+                    }
+                }
+            } catch (err) {
+                addTerminalLog(`❌ 错误：${err.message}`, 'error');
+                if (runBtn) {
+                    runBtn.classList.remove('running');
+                    runBtn.innerHTML = '▶ 运行';
+                }
+            }
         }
 
         /**
@@ -1405,7 +1587,14 @@
          * @param {HTMLElement} runBtn - 运行按钮
          */
         async function runPythonCode(code, preBlock, runBtn) {
-            await runCode(code, 'python', runBtn);
+            // AI 代码块使用唯一标识符
+            const uniqueId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const filePath = '__ai_block__' + uniqueId;
+            
+            // 临时存储 filePath 到按钮上，用于停止时查找
+            runBtn.dataset.filePath = filePath;
+            
+            await runCode(code, 'python', runBtn, filePath);
         }
 
         /**
@@ -1415,7 +1604,14 @@
          * @param {HTMLElement} runBtn - 运行按钮
          */
         async function runJavaScriptCode(code, preBlock, runBtn) {
-            await runCode(code, 'javascript', runBtn);
+            // AI 代码块使用唯一标识符
+            const uniqueId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const filePath = '__ai_block__' + uniqueId;
+            
+            // 临时存储 filePath 到按钮上，用于停止时查找
+            runBtn.dataset.filePath = filePath;
+            
+            await runCode(code, 'javascript', runBtn, filePath);
         }
 
         /**
@@ -1423,6 +1619,21 @@
          */
         function clearTerminal() {
             domElements.terminalOutput.innerHTML = '';
+        }
+
+        /**
+         * 显示 Toast 提示
+         * @param {string} message - 提示消息
+         * @param {string} type - 类型 (success, error, info)
+         */
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 1000);
         }
 
         /**
@@ -1596,17 +1807,12 @@
                     runBtn.title = `运行${language === 'python' || language === 'py' ? 'Python' : 'JavaScript'}代码`;
                     runBtn.addEventListener('click', async () => {
                         if (runBtn.classList.contains('running')) {
-                            // 查找当前按钮对应的执行ID
-                            let btnExecutionId = null;
-                            for (const [execId, task] of Object.entries(runningTasks)) {
-                                if (task.runBtn === runBtn) {
-                                    btnExecutionId = execId;
-                                    break;
-                                }
-                            }
+                            // 使用按钮上存储的 filePath 查找对应的 executionId
+                            const filePath = runBtn.dataset.filePath;
+                            const executionId = filePath ? runningByFile[filePath] : null;
                             
-                            if (btnExecutionId) {
-                                await stopRunningCode(runBtn, btnExecutionId);
+                            if (executionId) {
+                                await stopRunningCode(runBtn, executionId);
                             }
                             return;
                         }

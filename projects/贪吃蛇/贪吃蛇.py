@@ -104,7 +104,7 @@ def gameLoop():
 
 
 
-    # 蛇的身体
+    
 
     snake_list = []
 

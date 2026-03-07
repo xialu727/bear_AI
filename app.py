@@ -1,6 +1,7 @@
 import os
 import dashscope
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from dashscope import Generation
 import sqlite3
@@ -8,11 +9,22 @@ import subprocess
 import signal
 import time
 import re
+import tempfile
 
 # 初始化Flask应用
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'simple-key'
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# 启用 CORS（允许跨域访问）
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # 配置API密钥
 dashscope.api_key = os.getenv('qinwen_api_key')
@@ -449,9 +461,208 @@ def delete_file(file_id):
     finally:
         conn.close()
 
+def run_project_file(execution_id, script_path, cwd, project_id, source):
+    """运行项目文件（project模式）"""
+    import os as os_module
+    import sys
+    
+    # 路径校验
+    validation_result = validate_project_paths(script_path, cwd, project_id)
+    if validation_result:
+        return validation_result
+    
+    # 创建临时文件来存储输出
+    temp_output = tempfile.NamedTemporaryFile(mode='w+', delete=False, encoding='utf-8')
+    temp_output_path = temp_output.name
+    temp_output.close()
+    
+    # 清理环境变量，避免子进程继承Flask的WERKZEUG_*变量导致WinError 10038
+    clean_env = os_module.environ.copy()
+    env_vars_to_remove = ['WERKZEUG_RUN_MAIN', 'WERKZEUG_SERVER_FD', 'FLASK_RUN_FROM_CLI']
+    for var in env_vars_to_remove:
+        clean_env.pop(var, None)
+    
+    # 使用子进程执行项目文件（Windows上设置进程组以便终止整个进程树）
+    try:
+        if os_module.name == 'nt':
+            # Windows: 创建新进程组
+            process = subprocess.Popen(
+                [sys.executable, '-u', script_path],
+                cwd=cwd,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                env=clean_env
+            )
+        else:
+            # Unix/Linux
+            process = subprocess.Popen(
+                [sys.executable, '-u', script_path],
+                cwd=cwd,
+                preexec_fn=os_module.setsid,
+                env=clean_env
+            )
+        
+        # 检测是否为Web服务
+        is_web_service = detect_web_service(script_path)
+        
+        # 存储进程引用和临时文件路径
+        running_processes[execution_id] = {
+            'process': process,
+            'temp_output_path': temp_output_path,
+            'temp_code_path': None,  # project模式不需要临时代码文件
+            'temp_user_code_path': None,  # project模式直接使用项目文件，不保存到temp_user_code_path
+            'task_type': 'service' if is_web_service else 'task',
+            'is_web_service': is_web_service,
+            'start_time': time.time(),
+            'run_mode': 'project',
+            'cwd': cwd,
+            'script_path': script_path,
+            'project_id': project_id,
+            'source': source
+        }
+        
+        # 立即返回，让代码在后台运行
+        if is_web_service:
+            output_message = '🌐 Web服务已启动（后台运行中）'
+            service_url = extract_service_url(script_path)
+        else:
+            output_message = '✅ 代码开始执行（后台运行中）'
+            service_url = None
+        
+        return jsonify({
+            'output': output_message,
+            'execution_id': execution_id,
+            'running': True,
+            'is_web_service': is_web_service,
+            'service_url': service_url,
+            'run_mode': 'project',
+            'script_path': script_path,
+            'cwd': cwd
+        })
+            
+    except Exception as e:
+        # 清理临时文件
+        try:
+            os_module.unlink(temp_output_path)
+        except:
+            pass
+        
+        # 清理进程引用
+        if execution_id in running_processes:
+            del running_processes[execution_id]
+        
+        return jsonify({'error': f"启动失败: {str(e)}"}), 500
+
+def validate_project_paths(script_path, cwd, project_id):
+    """校验项目路径（project模式）"""
+    import os as os_module
+    
+    # 检查路径是否为绝对路径
+    if not os_module.path.isabs(script_path):
+        return jsonify({'error': 'script_path 必须是绝对路径'}), 400
+    
+    if not os_module.path.isabs(cwd):
+        return jsonify({'error': 'cwd 必须是绝对路径'}), 400
+    
+    # 检查路径是否存在
+    if not os_module.path.exists(script_path):
+        return jsonify({'error': f'script_path 不存在: {script_path}'}), 400
+    
+    if not os_module.path.isfile(script_path):
+        return jsonify({'error': f'script_path 必须是文件: {script_path}'}), 400
+    
+    if not os_module.path.exists(cwd):
+        return jsonify({'error': f'cwd 不存在: {cwd}'}), 400
+    
+    if not os_module.path.isdir(cwd):
+        return jsonify({'error': f'cwd 必须是目录: {cwd}'}), 400
+    
+    # 检查 script_path 是否在 cwd 内
+    script_abs = os_module.path.abspath(script_path)
+    cwd_abs = os_module.path.abspath(cwd)
+    
+    if not script_abs.startswith(cwd_abs):
+        return jsonify({'error': 'script_path 必须在 cwd 目录内'}), 400
+    
+    # 如果提供了 project_id，校验 cwd 是否属于该项目
+    if project_id:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT root_path FROM projects WHERE id = ?', (project_id,))
+            project = cursor.fetchone()
+            
+            if not project:
+                return jsonify({'error': f'项目不存在: project_id={project_id}'}), 400
+            
+            project_root = project[0]
+            project_root_abs = os_module.path.abspath(project_root)
+            
+            if not cwd_abs.startswith(project_root_abs):
+                return jsonify({'error': 'cwd 不属于指定项目'}), 400
+        finally:
+            conn.close()
+    
+    return None  # 校验通过
+
+def detect_web_service(script_path):
+    """检测是否为Web服务"""
+    import re
+    
+    try:
+        with open(script_path, 'r', encoding='utf-8') as f:
+            code = f.read()
+        
+        web_frameworks = [
+            r'app\.run\(',  # Flask
+            r'uvicorn\.run\(',  # FastAPI/Starlette
+            r'serve\(',  # aiohttp
+            r'make_server\(',  # WSGI
+            r'HTTPServer\(',  # http.server
+            r'TCPServer\(',  # socket server
+            r'werkzeug\.run_simple\(',  # Werkzeug
+            r'cherrypy\.quickstart\(',  # CherryPy
+            r'bottle\.run\(',  # Bottle
+            r'pyramid\.main\(',  # Pyramid
+            r'tornado\.web\.Application\(',  # Tornado
+            r'gunicorn\.run\(',  # Gunicorn
+        ]
+        
+        for pattern in web_frameworks:
+            if re.search(pattern, code):
+                return True
+        
+        return False
+    except:
+        return False
+
+def extract_service_url(script_path):
+    """从代码中提取服务URL"""
+    import re
+    
+    try:
+        with open(script_path, 'r', encoding='utf-8') as f:
+            code = f.read()
+        
+        service_host = '0.0.0.0'
+        service_port = '5000'
+        
+        host_match = re.search(r'host\s*=\s*["\']([^"\']+)["\']', code)
+        if host_match:
+            service_host = host_match.group(1)
+            if service_host == '0.0.0.0':
+                service_host = 'localhost'
+        
+        port_match = re.search(r'port\s*=\s*(\d+)', code)
+        if port_match:
+            service_port = port_match.group(1)
+        
+        return f'http://{service_host}:{service_port}'
+    except:
+        return None
+
 @app.route('/api/run', methods=['POST'])
 def run_code():
-    """运行代码（支持自动安装库）"""
+    """运行代码（支持snippet和project两种模式）"""
     import re
     import io
     import sys
@@ -462,14 +673,24 @@ def run_code():
     import os as os_module
     
     data = request.json
+    run_mode = data.get('run_mode', 'snippet')  # snippet 或 project
     code = data.get('code', '')
     language = data.get('language', 'python')
-    
-    if not code:
-        return jsonify({'error': '代码不能为空'}), 400
+    script_path = data.get('script_path', '')
+    cwd = data.get('cwd', '')
+    project_id = data.get('project_id', '')
+    source = data.get('source', 'editor')  # editor 或 chat
     
     # 生成唯一的执行ID
     execution_id = str(uuid.uuid4())
+    
+    # Project 模式：直接运行项目文件
+    if run_mode == 'project':
+        return run_project_file(execution_id, script_path, cwd, project_id, source)
+    
+    # Snippet 模式：运行代码片段（原有逻辑）
+    if not code:
+        return jsonify({'error': '代码不能为空'}), 400
     
     if language == 'python':
         # 检测Python代码中的import语句
@@ -710,6 +931,7 @@ def stop_code():
         process = proc_info['process']
         temp_output_path = proc_info['temp_output_path']
         temp_code_path = proc_info['temp_code_path']
+        temp_user_code_path = proc_info.get('temp_user_code_path')
         
         try:
             # 检查进程是否还在运行
@@ -755,8 +977,12 @@ def stop_code():
             
             # 清理临时文件
             try:
-                os_module.unlink(temp_output_path)
-                os_module.unlink(temp_code_path)
+                if temp_output_path and os_module.path.exists(temp_output_path):
+                    os_module.unlink(temp_output_path)
+                if temp_code_path and os_module.path.exists(temp_code_path):
+                    os_module.unlink(temp_code_path)
+                if temp_user_code_path and os_module.path.exists(temp_user_code_path):
+                    os_module.unlink(temp_user_code_path)
                 input_file = temp_output_path + '.input'
                 if os_module.path.exists(input_file):
                     os_module.unlink(input_file)
@@ -824,9 +1050,11 @@ def get_output():
             
             # 清理临时文件
             try:
-                os_module.unlink(temp_output_path)
-                os_module.unlink(proc_info['temp_code_path'])
-                if 'temp_user_code_path' in proc_info:
+                if temp_output_path and os_module.path.exists(temp_output_path):
+                    os_module.unlink(temp_output_path)
+                if proc_info['temp_code_path'] and os_module.path.exists(proc_info['temp_code_path']):
+                    os_module.unlink(proc_info['temp_code_path'])
+                if 'temp_user_code_path' in proc_info and proc_info['temp_user_code_path'] and os_module.path.exists(proc_info['temp_user_code_path']):
                     os_module.unlink(proc_info['temp_user_code_path'])
                 input_file = temp_output_path + '.input'
                 if os_module.path.exists(input_file):
