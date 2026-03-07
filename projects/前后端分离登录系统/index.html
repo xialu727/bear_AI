@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .msg {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-bottom: 20px;
+            text-align: center;
+            min-height: 20px;
+        }
+        .info {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="card" id="loginCard">
+        <h2>登录</h2>
+        <div class="msg" id="msg"></div>
+        <div class="form-group">
+            <label for="username">用户名</label>
+            <input type="text" id="username" name="username" placeholder="请输入用户名">
+        </div>
+        <div class="form-group">
+            <label for="password">密码</label>
+            <input type="password" id="password" name="password" placeholder="请输入密码">
+        </div>
+        <button type="button" id="loginBtn" onclick="login()">登录</button>
+        <div class="info">测试账号：admin / 123456</div>
+    </div>
+
+    <div class="card hidden" id="homeCard">
+        <h2>登录成功</h2>
+        <p id="welcome" style="text-align:center; color:#333; font-size:18px; margin:20px 0;"></p>
+        <button type="button" id="logoutBtn" onclick="logout()">退出登录</button>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5001/api';
+        let authToken = localStorage.getItem('authToken');
+
+        if (authToken) {
+            checkAuth();
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const msgDiv = document.getElementById('msg');
+            const loginBtn = document.getElementById('loginBtn');
+            
+            if (!username || !password) {
+                msgDiv.textContent = '请输入用户名和密码';
+                return;
+            }
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = '登录中...';
+            msgDiv.textContent = '';
+            
+            try {
+                console.log('发送登录请求到:', API_BASE + '/login');
+                console.log('请求体:', { username, password });
+                
+                const response = await fetch(API_BASE + '/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                console.log('响应状态:', response.status);
+                const data = await response.json();
+                console.log('响应数据:', data);
+                
+                if (data.success) {
+                    authToken = data.token;
+                    localStorage.setItem('authToken', authToken);
+                    showHome(data.username);
+                } else {
+                    msgDiv.textContent = data.message || '登录失败';
+                }
+            } catch (error) {
+                console.error('登录错误:', error);
+                msgDiv.textContent = '网络错误，请检查后端是否启动';
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = '登录';
+            }
+        }
+
+        async function logout() {
+            const msgDiv = document.getElementById('msg');
+            
+            try {
+                console.log('发送退出请求');
+                const response = await fetch(API_BASE + '/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+                
+                console.log('响应状态:', response.status);
+                const data = await response.json();
+                console.log('响应数据:', data);
+                
+                localStorage.removeItem('authToken');
+                authToken = null;
+                showLogin();
+                msgDiv.textContent = '退出登录成功';
+            } catch (error) {
+                console.error('退出错误:', error);
+                msgDiv.textContent = '退出失败';
+            }
+        }
+
+        async function checkAuth() {
+            try {
+                console.log('检查登录状态，token:', authToken);
+                const response = await fetch(API_BASE + '/home', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+                
+                console.log('响应状态:', response.status);
+                const data = await response.json();
+                console.log('响应数据:', data);
+                
+                if (data.success) {
+                    showHome(data.username);
+                } else {
+                    localStorage.removeItem('authToken');
+                    authToken = null;
+                    showLogin();
+                }
+            } catch (error) {
+                console.error('检查错误:', error);
+                localStorage.removeItem('authToken');
+                authToken = null;
+                showLogin();
+            }
+        }
+
+        function showHome(username) {
+            document.getElementById('loginCard').classList.add('hidden');
+            document.getElementById('homeCard').classList.remove('hidden');
+            document.getElementById('welcome').textContent = '欢迎你，' + username;
+        }
+
+        function showLogin() {
+            document.getElementById('homeCard').classList.add('hidden');
+            document.getElementById('loginCard').classList.remove('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('msg').textContent = '';
+        }
+    </script>
+</body>
+</html>
