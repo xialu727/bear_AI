@@ -1,186 +1,162 @@
-# 🐻 小熊AI助手
+# 小熊 AI Web IDE（Flask + SQLite + Aider）
 
-一个基于通义千问API的智能对话助手，支持Web界面和终端两种交互方式，提供流式对话体验和对话历史记忆功能。
+一个本地运行的 Web IDE：支持项目管理、文件编辑、代码运行、终端输出、普通 AI 聊天（通义千问）和 Aider 代码改写模式。
 
-## ✨ 功能特点
+## 1：欢迎界面
+![小熊AI代码编辑器 - 欢迎界面](images/editor_screenshot1.png)
 
-- 🌐 **Web界面**：精美的渐变UI设计，支持实时流式对话
-- 💬 **对话记忆**：自动保存最近5轮对话，支持上下文理解
-- ⚡ **流式输出**：打字机效果，实时展示AI回答过程
-- 📋 **复制功能**：一键复制AI回答内容
-- 🔄 **重新生成**：对最新回答不满意可重新生成
-- ⏹️ **停止生成**：随时中断AI回答
-- 🖥️ **终端模式**：支持命令行下的AI对话
-- 📝 **Markdown渲染**：支持代码高亮和格式化显示
-- 🎨 **代码复制**：代码块一键复制功能
+## 2：代码编辑界面
+![小熊AI代码编辑器 - 代码编辑界面](images/editor_screenshot2.png)
 
-## 🛠️ 技术栈
+## 功能概览
 
-- **后端框架**: Flask + Flask-SocketIO
-- **前端技术**: HTML5 + JavaScript + WebSocket
-- **AI模型**: 阿里云通义千问 (DashScope API)
-- **Markdown**: marked.js + highlight.js
+- 项目管理
+  - 创建/删除项目
+  - 项目文件扫描与列表展示
+- 文件管理
+  - 新建、打开、保存、另存为、删除文件
+- 编辑器 + 终端
+  - Monaco 编辑器
+  - 运行/停止 Python、JavaScript 代码
+  - Web 服务检测与运行状态管理
+- AI 聊天
+  - Socket.IO 流式返回（通义千问）
+  - 支持停止生成、重新生成、代码块复制/运行/保存
+- Aider 模式
+  - 从聊天区触发 Aider 改码
+  - 支持上下文文件选择（add/clear）
+  - 运行结束后自动同步文件到数据库
 
-## 📋 前置要求
+## 技术栈
 
-- Python 3.7+
-- 阿里云通义千问API密钥
+- 后端: Flask, Flask-SocketIO, Flask-CORS, SQLite
+- 前端: HTML + CSS + JavaScript + Monaco
+- AI:
+  - 普通聊天: DashScope（通义千问）
+  - 代码改写: Aider + OpenAI 兼容接口（当前代码默认 DeepSeek API Base）
 
-## 🚀 快速开始
+## 项目结构
 
-### 1. 克隆项目
-
-```bash
-git clone https://github.com/你的用户名/python_ai_bot.git
-cd python_ai_bot
+```text
+python_ai_bot/
+├─ app.py
+├─ templates/
+│  └─ index.html
+├─ projects/                  # 你的项目根目录（每个项目一个子目录）
+├─ ai_code_manager.db         # SQLite 数据库
+├─ requirements.txt
+└─ README.md
 ```
 
-### 2. 安装依赖
+## 环境要求
+
+- Python 3.10+
+- Windows / Linux / macOS
+- 可联网（用于模型 API）
+
+## 安装
 
 ```bash
-pip install flask flask-socketio dashscope
+pip install -r requirements.txt
 ```
 
-### 3. 配置API密钥
+## 环境变量
 
-设置环境变量（Windows PowerShell）：
+### 1) 普通 AI 聊天（通义千问）
+
+必须配置：
+
+- `qinwen_api_key`
+
+Windows PowerShell:
+
 ```powershell
-$env:qinwen_api_key = "你的通义千问API密钥"
+setx qinwen_api_key "你的通义千问key"
+# 当前终端立刻生效（可选）
+$env:qinwen_api_key="你的通义千问key"
 ```
 
-或者设置环境变量（Linux/Mac）：
-```bash
-export qinwen_api_key="你的通义千问API密钥"
+### 2) Aider 模式（代码改写）
+
+至少配置一个：
+
+- `OPENAI_API_KEY` 或 `DEEPSEEK_API_KEY`
+
+建议同时配置（如果你走 DeepSeek 兼容 OpenAI）：
+
+- `OPENAI_API_BASE=https://api.deepseek.com`
+
+PowerShell 示例：
+
+```powershell
+setx OPENAI_API_KEY "你的key"
+setx OPENAI_API_BASE "https://api.deepseek.com"
 ```
 
-### 4. 运行Web版本
+## 运行
 
 ```bash
 python app.py
 ```
 
-然后在浏览器访问：`http://localhost:5000`
+启动后访问：
 
-### 5. 运行终端版本
+- 本机: [http://127.0.0.1:5000](http://127.0.0.1:5000)
+- 局域网: `http://你的局域网IP:5000`
 
-```bash
-python 终端版ai助手.py
+## 使用流程（建议）
+
+1. 新建项目（指定绝对路径）
+2. 新建或打开文件
+3. 在编辑器编写代码并保存
+4. 点击运行查看终端输出
+5. 需要 AI 改码时切到 Aider 模式并发送需求
+
+## Aider 推荐预设（可选）
+
+```powershell
+setx AIDER_YES_ALWAYS "1"
+setx AIDER_NO_GIT "1"
+setx AIDER_NO_GITIGNORE "1"
 ```
 
-## 📁 项目结构
+如果你想把 Aider 历史文件统一到一个目录：
 
-```
-python_ai_bot/
-├── app.py                 # Web服务主程序
-├── 终端版ai助手.py        # 终端版AI助手
-├── templates/
-│   └── index.html        # Web界面模板
-└── README.md             # 项目说明文档
+```powershell
+setx AIDER_INPUT_HISTORY_FILE "C:\Users\30599\Desktop\python_ai_bot\.aider_data\input.history"
+setx AIDER_CHAT_HISTORY_FILE "C:\Users\30599\Desktop\python_ai_bot\.aider_data\chat.history.md"
 ```
 
-## 💡 使用说明
+## API 简表（核心）
 
-### Web界面使用
+- `GET /api/projects` 获取项目列表
+- `POST /api/projects` 创建项目
+- `DELETE /api/projects/<id>` 删除项目
+- `GET /api/projects/<id>/files` 获取项目文件
+- `POST /api/files` 新建/保存文件
+- `GET /api/files/<id>` 获取文件内容
+- `DELETE /api/files/<id>` 删除文件
+- `POST /api/run` 运行代码（snippet/project/aider）
+- `POST /api/output` 轮询输出
+- `POST /api/stop` 停止运行
+- `POST /api/aider/context/select` 选择 Aider 上下文
+- `POST /api/aider/context/clear` 清除 Aider 上下文
+- `GET /api/aider/context` 查询当前上下文
 
-1. 在输入框输入你的问题
-2. 点击"发送"或按Enter键提交
-3. AI会实时流式返回回答
-4. 可以点击📋复制回答内容
-5. 点击⏹停止AI生成
-6. 最新回答支持🔄重新生成
+## 常见问题
 
-### 终端使用
+- 重启后环境变量看不到  
+  `setx` 只对新进程生效。重开 IDE/终端后再看。
 
-1. 运行终端版程序
-2. 输入问题后按Enter
-3. 输入`exit`或`quit`退出程序
+- 局域网访问时 AI 一直转圈  
+  检查 API Key、跨机器访问地址、以及后端是否绑定 `0.0.0.0`。
 
-## 🎯 核心功能实现
+- Aider 创建了奇怪文件名  
+  建议开启 `--yes-always` 前先收紧 prompt，并尽量给明确目标文件。
 
-### 对话记忆机制
+## 开发说明
 
-使用Python列表存储最近5轮对话（10条消息），超过限制自动删除最早的对话：
-
-```python
-# 保留最后10条消息（5轮对话）
-if len(user_histories[user_id]) > 10:
-    user_histories[user_id] = user_histories[user_id][-10:]
+- 数据库启动时会启用 `PRAGMA foreign_keys = ON`
+- 启动会自动初始化表结构并清理孤儿记录
+- 建议把 `projects/` 与数据库定期备份
 ```
-
-### 历史对话控制
-
-- ✅ 所有对话支持复制功能
-- ✅ 仅最新对话支持重新生成
-- ⏹ 历史对话的重新生成按钮已禁用
-
-## 🎨 界面预览
-
-![小熊AI助手界面](screenshot.png)
-![复制和暂停](223.png)
-### 界面特色
-
-- 🎨 渐变背景设计
-- 🐻 可爱的小熊主题
-- ✨ 流畅的动画效果
-- 💻 代码高亮显示
-- 📱 响应式布局
-- 🌈 紫粉色渐变主题
-
-## 📝 API配置
-
-获取通义千问API密钥：
-1. 访问 [阿里云DashScope](https://dashscope.aliyun.com/)
-2. 注册/登录账号
-3. 创建API密钥
-4. 设置环境变量
-
-## 🔧 自定义配置
-
-### 修改对话记忆轮数
-
-在 `app.py` 中修改：
-
-```python
-# 修改保留的消息数量（轮数 × 2）
-if len(user_histories[user_id]) > 10:  # 改为其他数字
-    user_histories[user_id] = user_histories[user_id][-10:]
-```
-
-### 修改AI模型
-
-```python
-responses = Generation.call(
-    model="qwen-turbo",  # 可改为 qwen-plus, qwen-max 等
-    # ...
-)
-```
-
-## 🐛 常见问题
-
-**Q: 提示API密钥错误？**  
-A: 确保环境变量 `qinwen_api_key` 已正确设置
-
-**Q: 历史对话复制失败？**  
-A: 请使用 Ctrl+Shift+R 硬刷新浏览器清除缓存
-
-**Q: WebSocket连接失败？**  
-A: 检查防火墙设置，确保5000端口未被占用
-
-## 📄 开源协议
-
-MIT License
-
-## 👨‍💻 作者
-
-欢迎提交Issue和Pull Request！
-
-## 🙏 致谢
-
-- [阿里云通义千问](https://tongyi.aliyun.com/)
-- [Flask](https://flask.palletsprojects.com/)
-- [marked.js](https://marked.js.org/)
-- [highlight.js](https://highlightjs.org/)
-
----
-
-⭐ 如果这个项目对你有帮助，请给个Star支持一下！
