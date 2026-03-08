@@ -5,13 +5,10 @@ import time
 import webbrowser
 from pathlib import Path
 
-# 临时写死你的项目目录
+# 项目根目录
 BASE_DIR = Path(__file__).resolve().parent
 BACKEND_FILE = BASE_DIR / "backend.py"
 FRONTEND_DIR = BASE_DIR
-
-
-
 
 BACKEND_PORT = 5001
 FRONTEND_PORT = 5173
@@ -20,11 +17,11 @@ FRONTEND_PORT = 5173
 def install_dependencies():
     try:
         import flask_cors  # noqa: F401
-        print("[OK] flask-cors already installed")
+        print("[OK] flask-cors 已经装好了")
     except ImportError:
-        print("[INFO] Installing flask-cors ...")
+        print("[i] 正在安装 flask-cors ...")
         subprocess.run([sys.executable, "-m", "pip", "install", "flask-cors"], check=True)
-        print("[OK] flask-cors installed")
+        print("[OK] flask-cors 安装完成")
 
 
 def is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
@@ -50,35 +47,35 @@ def stop_process(proc: subprocess.Popen, name: str):
     try:
         proc.terminate()
         proc.wait(timeout=3)
-        print(f"[OK] {name} terminated")
+        print(f"[OK] {name} 已停止")
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait(timeout=2)
-        print(f"[OK] {name} killed")
+        print(f"[OK] {name} 被强制关闭")
 
 
 def main():
     install_dependencies()
 
     if not BACKEND_FILE.exists():
-        print(f"[ERR] backend.py not found: {BACKEND_FILE}")
+        print(f"[X] 找不到 backend.py: {BACKEND_FILE}")
         sys.exit(1)
 
     if is_port_in_use(BACKEND_PORT):
-        print(f"[ERR] Port {BACKEND_PORT} is already in use. Please stop old process first.")
+        print(f"[X] 端口 {BACKEND_PORT} 已经被占用了，先关掉之前的进程吧")
         sys.exit(1)
 
     if is_port_in_use(FRONTEND_PORT):
-        print(f"[ERR] Port {FRONTEND_PORT} is already in use. Please stop old process first.")
+        print(f"[X] 端口 {FRONTEND_PORT} 已经被占用了，先关掉之前的进程吧")
         sys.exit(1)
 
     print("=" * 48)
-    print("[INFO] Starting separated frontend/backend login demo")
-    print(f"[INFO] Backend file: {BACKEND_FILE}")
-    print(f"[INFO] Frontend dir : {FRONTEND_DIR}")
-    print(f"[INFO] Backend URL  : http://localhost:{BACKEND_PORT}")
-    print(f"[INFO] Frontend URL : http://localhost:{FRONTEND_PORT}/index.html")
-    print("[INFO] Press Ctrl+C to stop")
+    print("[i] 正在启动前后端分离的登录演示")
+    print(f"[i] 后端文件: {BACKEND_FILE}")
+    print(f"[i] 前端目录: {FRONTEND_DIR}")
+    print(f"[i] 后端地址: http://localhost:{BACKEND_PORT}")
+    print(f"[i] 前端地址: http://localhost:{FRONTEND_PORT}/index.html")
+    print("[i] 按 Ctrl+C 可以停止服务")
     print("=" * 48)
 
     backend_proc = None
@@ -108,34 +105,34 @@ def main():
         frontend_ok = wait_port_ready(FRONTEND_PORT, timeout=10)
 
         if not backend_ok:
-            print(f"[ERR] Backend failed to start on port {BACKEND_PORT}")
+            print(f"[X] 后端没能在端口 {BACKEND_PORT} 上启动起来")
         if not frontend_ok:
-            print(f"[ERR] Frontend failed to start on port {FRONTEND_PORT}")
+            print(f"[X] 前端没能在端口 {FRONTEND_PORT} 上启动起来")
 
         if backend_ok and frontend_ok:
-            print("[OK] Services started")
+            print("[OK] 服务都启动好啦！")
             webbrowser.open(f"http://localhost:{FRONTEND_PORT}/index.html")
         else:
-            print("[ERR] Startup incomplete, stopping processes...")
-            stop_process(frontend_proc, "frontend")
-            stop_process(backend_proc, "backend")
+            print("[X] 启动没完成，正在关闭进程...")
+            stop_process(frontend_proc, "前端")
+            stop_process(backend_proc, "后端")
             sys.exit(1)
 
         while True:
             if backend_proc.poll() is not None:
-                print("[ERR] Backend process exited unexpectedly")
+                print("[X] 后端进程意外退出了")
                 break
             if frontend_proc.poll() is not None:
-                print("[ERR] Frontend process exited unexpectedly")
+                print("[X] 前端进程意外退出了")
                 break
             time.sleep(1)
 
     except KeyboardInterrupt:
-        print("\n[INFO] Stopping services...")
+        print("\n[i] 正在停止服务...")
     finally:
-        stop_process(frontend_proc, "frontend")
-        stop_process(backend_proc, "backend")
-        print("[OK] All services stopped")
+        stop_process(frontend_proc, "前端")
+        stop_process(backend_proc, "后端")
+        print("[OK] 所有服务都停掉了")
 
 
 if __name__ == "__main__":

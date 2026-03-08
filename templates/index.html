@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -181,6 +181,13 @@
             background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%);
             color: #8b5cf6;
             font-weight: 600;
+        }
+
+        .file-item.aider-selected {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
+            color: #10b981;
+            font-weight: 600;
+            border: 1px solid rgba(16, 185, 129, 0.3);
         }
 
         .file-icon {
@@ -533,6 +540,35 @@
             z-index: 1;
         }
 
+        #chatModeSelect {
+            padding: 8px 10px;
+            border: 2px solid rgba(139, 92, 246, 0.2);
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+            min-width: 42px;
+            max-width: 42px;
+            height: 42px;
+            text-align: center;
+            color: #4b5563;
+        }
+
+        #chatModeSelect:hover {
+            border-color: rgba(139, 92, 246, 0.4);
+            background: rgba(255, 255, 255, 1);
+        }
+
+        #chatModeSelect:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1), inset 0 2px 8px rgba(0, 0, 0, 0.05);
+            transform: translateY(-1px);
+        }
+
         #input {
             flex: 1;
             padding: 16px 24px;
@@ -723,6 +759,32 @@
             .copy-code-btn { right: 6px; }
             .save-code-btn { right: calc(6px + 40px + 6px); }
             .code-run-btn { right: calc(6px + 40px + 6px + 40px + 6px); }
+            
+            #chatModeSelect {
+                min-width: 36px;
+                max-width: 36px;
+                padding: 6px 8px;
+                font-size: 18px;
+                height: 36px;
+            }
+            
+            .input-area {
+                flex-wrap: wrap;
+            }
+            
+            #input {
+                order: 2;
+                flex-basis: 100%;
+                margin-top: 8px;
+            }
+            
+            #chatModeSelect {
+                order: 1;
+            }
+            
+            .btn-group {
+                order: 3;
+            }
         }
     </style>
 
@@ -786,7 +848,11 @@
             </div>
             <div class="chat-box" id="chatBox"></div>
             <div class="input-area">
-                <input id="input" placeholder="请输入您的问题...">
+                <select id="chatModeSelect">
+                    <option value="ai">🐻</option>
+                    <option value="aider">🤖</option>
+                </select>
+                <input id="input" placeholder="请输入...">
                 <div class="btn-group">
                     <button id="send" onclick="send()">发送</button>
                     <button id="stop" onclick="stopGeneration()" style="display: none;">⏹</button>
@@ -796,6 +862,87 @@
     </div>
 
     <script>
+        // 统一 JSON 安全解析函数
+        async function safeJson(response) {
+            try {
+                const text = await response.text();
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    return { error: text };
+                }
+            } catch (e) {
+                return { error: e.message };
+            }
+        }
+
+        // Aider 输出过滤函数
+        function cleanAiderOutput(raw, prompt = '') {
+            if (!raw) return '';
+
+            let lines = raw.replace(/\r/g, '').split('\n');
+            let cleanedLines = [];
+
+            for (let line of lines) {
+                let trimmed = line.trim();
+                
+                // 先去掉开头的 > 符号
+                if (trimmed.startsWith('> ')) {
+                    trimmed = trimmed.substring(2).trim();
+                } else if (trimmed.startsWith('>')) {
+                    trimmed = trimmed.substring(1).trim();
+                }
+
+                // 检查是否是噪音行
+                const noisePatterns = [
+                    'Aider v',
+                    'Model:',
+                    'Git repo:',
+                    'Repo-map:',
+                    'Added ',
+                    'Note: in-chat filenames',
+                    'Cur working dir:',
+                    'Git working dir:',
+                    'Tokens:',
+                    '✅ Aider 完成，已同步',
+                    'https://aider.chat/docs/',
+                    'Open documentation url'
+                ];
+
+                let isNoise = false;
+                for (let pattern of noisePatterns) {
+                    if (trimmed.includes(pattern)) {
+                        isNoise = true;
+                        break;
+                    }
+                }
+
+                if (!isNoise) {
+                    // 去掉开头的 > 符号后保留
+                    let cleanLine = line;
+                    if (cleanLine.trim().startsWith('> ')) {
+                        cleanLine = cleanLine.replace(/^\s*> /, '');
+                    } else if (cleanLine.trim().startsWith('>')) {
+                        cleanLine = cleanLine.replace(/^\s*>/, '');
+                    }
+                    cleanedLines.push(cleanLine);
+                }
+            }
+
+            let text = cleanedLines.join('\n');
+
+            // 去掉 Aider 回显的"#### 用户问题"
+            if (prompt && prompt.trim()) {
+                const esc = prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                text = text.replace(new RegExp(`^\\s*####\\s*${esc}\\s*\\n+`, 'm'), '');
+                // 也处理带 > 的情况
+                text = text.replace(new RegExp(`^\\s*>\\s*####\\s*${esc}\\s*\\n+`, 'm'), '');
+            }
+
+            // 清理多余的空行
+            return text.replace(/\n{3,}/g, '\n\n').trim();
+        }
+
         // 配置marked和highlight.js
         marked.setOptions({
             highlight: (code, lang) => {
@@ -822,12 +969,98 @@
         let projects = [], currentProjectId = null, currentFileId = null, currentFileData = null;
         let editor = null, editorMode = false;
         
+        // 获取客户端 ID（本地持久）
+        function getClientId() {
+            let id = localStorage.getItem('webide_client_id');
+            if (!id) {
+                id = crypto.randomUUID ? crypto.randomUUID() : 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('webide_client_id', id);
+            }
+            return id;
+        }
+        
+        // Aider 上下文请求函数
+        async function selectAiderContext(fileId) {
+            if (!currentProjectId) return;
+            try {
+                const response = await fetch('/api/aider/context/select', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        project_id: currentProjectId,
+                        file_id: fileId
+                    })
+                });
+                const result = await safeJson(response);
+                if (result.ok) {
+                    aiderSelectedFileId = fileId;
+                    console.log('[DEBUG] Aider 上下文已选择:', result.selected);
+                } else {
+                    console.error('[DEBUG] 选择 Aider 上下文失败:', result.error);
+                }
+            } catch (error) {
+                console.error('[DEBUG] 选择 Aider 上下文异常:', error);
+            }
+        }
+        
+        async function fetchAiderContext() {
+            if (!currentProjectId) return null;
+            try {
+                const response = await fetch(`/api/aider/context?client_id=${clientId}&project_id=${currentProjectId}`);
+                const result = await safeJson(response);
+                if (result.ok && result.selected) {
+                    aiderSelectedFileId = result.selected.file_id;
+                    console.log('[DEBUG] Aider 上下文已加载:', result.selected);
+                    return result.selected;
+                } else {
+                    aiderSelectedFileId = null;
+                    return null;
+                }
+            } catch (error) {
+                console.error('[DEBUG] 获取 Aider 上下文异常:', error);
+                aiderSelectedFileId = null;
+                return null;
+            }
+        }
+        
+        async function clearAiderContext() {
+            if (!currentProjectId) return;
+            try {
+                const response = await fetch('/api/aider/context/clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        project_id: currentProjectId
+                    })
+                });
+                const result = await safeJson(response);
+                if (result.ok) {
+                    aiderSelectedFileId = null;
+                    console.log('[DEBUG] Aider 上下文已清空');
+                }
+            } catch (error) {
+                console.error('[DEBUG] 清空 Aider 上下文异常:', error);
+            }
+        }
+        
         // 任务管理：按任务实例管理执行状态
         const runningTasks = {};
+        
+        // Aider 聊天任务映射
+        const aiderChatMap = {};
         
         // 按文件管理的运行状态
         const runningByFile = {};  // filePath -> executionId
         const taskMeta = {};        // executionId -> { filePath, runBtn, runMode, source }
+        
+        // Aider 上下文管理
+        const clientId = getClientId();
+        let aiderSelectedFileId = null;  // 当前项目下选中的文件 id
+        
+        // 聊天模式管理
+        let chatMode = localStorage.getItem('chat_mode') || 'ai';  // 'ai' 或 'aider'
         
         // 服务管理
         const runningServices = {};
@@ -841,7 +1074,9 @@
             editorContainer: document.getElementById('editorContainer'),
             editorFileName: document.getElementById('editorFileName'),
             editorFileIcon: document.getElementById('editorFileIcon'),
-            terminalOutput: document.getElementById('terminalOutput')
+            terminalOutput: document.getElementById('terminalOutput'),
+            chatModeSelect: document.getElementById('chatModeSelect'),
+            input: document.getElementById('input')
         };
 
         // 初始化Monaco编辑器
@@ -907,6 +1142,11 @@
             try {
                 const response = await fetch(`/api/projects/${projectId}/files`);
                 const files = await response.json();
+                
+                // 先加载 Aider 上下文
+                await fetchAiderContext();
+                
+                // 再渲染文件树（带高亮）
                 renderFileTree(files);
             } catch (error) {
                 console.error('加载文件失败:', error);
@@ -961,6 +1201,9 @@
             files.forEach(file => {
                 const fileEl = document.createElement('div');
                 fileEl.className = 'file-item';
+                if (file.id === aiderSelectedFileId) {
+                    fileEl.className += ' aider-selected';
+                }
                 const icon = getFileIcon(file.file_type || file.filename);
                 fileEl.innerHTML = `
                     <span class="file-icon">${icon}</span>
@@ -999,6 +1242,38 @@
                 if (response.ok) {
                     currentFileId = fileId;
                     showEditor(fileData);
+                    
+                    // 检查是否二次点击同一文件
+                    if (fileId === aiderSelectedFileId) {
+                        // 二次点击：取消 Aider 上下文绑定
+                        await clearAiderContext();
+                        aiderSelectedFileId = null;
+                        
+                        // 刷新文件树高亮（取消绿色选中）
+                        if (currentProjectId) {
+                            const filesResponse = await fetch(`/api/projects/${currentProjectId}/files`);
+                            if (filesResponse.ok) {
+                                const files = await filesResponse.json();
+                                renderFileTree(files);
+                            }
+                        }
+                        
+                        // 轻提示
+                        showToast('已取消 Aider 上下文绑定', 'info');
+                    } else {
+                        // 第一次点击：添加到 Aider 上下文
+                        await selectAiderContext(fileId);
+                        aiderSelectedFileId = fileId;
+                        
+                        // 刷新文件树高亮
+                        if (currentProjectId) {
+                            const filesResponse = await fetch(`/api/projects/${currentProjectId}/files`);
+                            if (filesResponse.ok) {
+                                const files = await filesResponse.json();
+                                renderFileTree(files);
+                            }
+                        }
+                    }
                 } else {
                     alert('加载文件失败：' + fileData.error);
                 }
@@ -1156,8 +1431,9 @@
 
         /**
          * 保存当前文件
+         * @param {boolean} silent - 是否静默保存（不显示 toast）
          */
-        async function saveCurrentFile() {
+        async function saveCurrentFile(silent = false) {
             if (!currentFileId || !editor) return false;
 
             const saveBtn = document.querySelector('.save-btn');
@@ -1183,7 +1459,11 @@
                     if (!currentFileData) currentFileData = {};
                     currentFileData.file_path = result.file_path;
                     currentFileData.filename = document.getElementById('editorFileName').textContent;
-                    showToast('✅ 保存成功！', 'success');
+                    currentFileData.content = content;
+                    // 只在主动保存时显示 toast
+                    if (!silent) {
+                        showToast('✅ 保存成功！', 'success');
+                    }
                     return true;
                 } else {
                     showToast('保存失败：' + result.error, 'error');
@@ -1221,7 +1501,12 @@
                     body: JSON.stringify({ code, language })
                 });
 
-                const result = await response.json();
+                const result = await safeJson(response);
+
+                console.log(`[DEBUG] pollOutput result:`, result);
+                // console.log(`[DEBUG] task.runMode:`, task.runMode);
+                console.log(`[DEBUG] result.running:`, result.running);
+                console.log(`[DEBUG] result.output:`, result.output);
 
                 if (response.ok) {
                     const executionId = result.execution_id;
@@ -1305,7 +1590,7 @@
             }
         }
 
-        async function pollOutput(executionId) {
+        async function pollOutput(executionId, targetAbsPath = null, retryCount = 0) {
             const task = runningTasks[executionId];
             if (!task || !task.isRunning) {
                 return;
@@ -1321,7 +1606,44 @@
                     })
                 });
 
-                const result = await response.json();
+                if (!response.ok) {
+                    // 任务不存在（如后端已重启），清理 UI 状态
+                    if (response.status === 404) {
+                        console.log(`任务 ${executionId} 不存在，清理 UI 状态`);
+                        
+                        // 清理 Aider 聊天映射
+                        if (aiderChatMap[executionId]) {
+                            delete aiderChatMap[executionId];
+                        }
+                        
+                        // 清理任务和文件映射
+                        const meta = taskMeta[executionId];
+                        if (meta && meta.filePath) {
+                            delete runningByFile[meta.filePath];
+                        }
+                        delete taskMeta[executionId];
+                        delete runningTasks[executionId];
+                        
+                        // 恢复按钮状态
+                        if (task.runBtn) {
+                            task.runBtn.classList.remove('running');
+                            task.runBtn.innerHTML = '▶ 运行';
+                        }
+                        return;
+                    }
+                    
+                    // 对 500/502 等暂时错误做少量重试
+                    if (response.status >= 500 && retryCount < 5) {
+                        console.log(`轮询遇到 ${response.status} 错误，第 ${retryCount + 1} 次重试...`);
+                        setTimeout(() => pollOutput(executionId, targetAbsPath, retryCount + 1), 300);
+                        return;
+                    }
+                    
+                    console.error(`轮询请求失败: ${response.status}`);
+                    return;
+                }
+
+                const result = await safeJson(response);
 
                 if (response.ok) {
                     // 更新offset
@@ -1331,9 +1653,33 @@
                     
                     if (!result.running) {
                         // 代码执行完成
-                        if (result.output) {
-                            addTerminalLog(result.output, 'success');
+                        if (task.runMode === 'aider') {
+                            // Aider 模式：任务完成
+                            const aiderTask = aiderChatMap[executionId];
+                            if (aiderTask) {
+                                // 追加最终输出
+                                if (result.output) {
+                                    aiderTask.bufferText += result.output;
+                                    const cleaned = cleanAiderOutput(aiderTask.bufferText, aiderTask.prompt);
+                                    aiderTask.contentEl.innerHTML = marked.parse(cleaned || '...');
+                                }
+                                
+                                // 强制刷新文件树
+                                if (currentProjectId) {
+                                    console.log('[DEBUG] Aider 完成，刷新文件树');
+                                    selectProject(currentProjectId);
+                                }
+                                
+                                // 清理 Aider 聊天映射
+                                delete aiderChatMap[executionId];
+                            }
+                        } else {
+                            // 普通任务：显示到终端
+                            if (result.output) {
+                                addTerminalLog(result.output, 'success');
+                            }
                         }
+                        
                         // 只更新对应任务的按钮状态
                         if (task.runBtn) {
                             task.runBtn.classList.remove('running');
@@ -1362,8 +1708,20 @@
                                 await sendInput(user_input, executionId);
                             }
                         } else if (result.output) {
-                            // 显示输出（Web服务的持续输出）
-                            addTerminalLog(result.output, 'info');
+                            // 显示输出
+                            if (task.runMode === 'aider') {
+                                // Aider 模式：实时追加到聊天区
+                                const aiderTask = aiderChatMap[executionId];
+                                if (aiderTask) {
+                                    aiderTask.bufferText += result.output;
+                                    const cleaned = cleanAiderOutput(aiderTask.bufferText, aiderTask.prompt);
+                                    aiderTask.contentEl.innerHTML = marked.parse(cleaned || '...');
+                                    chatBox.scrollTop = chatBox.scrollHeight;
+                                }
+                            } else {
+                                // 普通任务：显示到终端
+                                addTerminalLog(result.output, 'info');
+                            }
                         }
                     }
                 }
@@ -1374,7 +1732,7 @@
             // 继续轮询
             const currentTask = runningTasks[executionId];
             if (currentTask && currentTask.isRunning) {
-                setTimeout(() => pollOutput(executionId), 100);
+                setTimeout(() => pollOutput(executionId, targetAbsPath), 100);
             }
         }
 
@@ -1491,9 +1849,9 @@
             );
 
             if (canUseProjectMode) {
-                const saved = await saveCurrentFile();
-                if (!saved) {
-                    addTerminalLog('❌ 保存失败，已取消运行', 'error');
+                // 检查编辑器内容与 currentFileData.content 是否一致
+                if (currentFileData && editor.getValue() !== currentFileData.content) {
+                    addTerminalLog('⚠️ 文件有未保存修改，继续运行将使用磁盘旧版本。请先点击保存。', 'warning');
                     return;
                 }
                 await runProjectFile(scriptPath, currentProject.root_path, currentProject.id, runBtn);
@@ -1529,7 +1887,7 @@
                     })
                 });
 
-                const result = await response.json();
+                const result = await safeJson(response);
 
                 if (response.ok) {
                     const executionId = result.execution_id;
@@ -1923,6 +2281,17 @@
             const text = input.value.trim();
             if (!text) return;
 
+            // 根据聊天模式分发
+            if (chatMode === 'ai') {
+                sendAiChat();
+            } else {
+                runAiderFromChat();
+            }
+        }
+
+        function sendAiChat() {
+            const text = input.value.trim();
+
             lastQuestion = text;
             chatBox.innerHTML += `<div class="user-msg">${text}</div>`;
             input.value = '';
@@ -1979,6 +2348,102 @@
         }
 
         /**
+         * 使用 Aider 编辑代码
+         */
+        async function runAiderFromChat() {
+            const prompt = input.value.trim();
+            if (!prompt) {
+                showToast('请输入要修改的代码描述', 'warning');
+                return;
+            }
+
+            // 校验是否已选择项目
+            if (!currentProjectId) {
+                showToast('请先选择一个项目', 'warning');
+                return;
+            }
+
+            // 获取 Aider 选中的文件（如果有）
+            let targetRelativePath = '';
+            if (aiderSelectedFileId) {
+                try {
+                    const response = await fetch(`/api/files/${aiderSelectedFileId}`);
+                    if (response.ok) {
+                        const fileData = await response.json();
+                        // /api/files/:id 返回扁平对象，直接读取 fileData.project_id / fileData.relative_path
+                        if (fileData.project_id === currentProjectId) {
+                            targetRelativePath = fileData.relative_path;
+                        }
+                    }
+                } catch (error) {
+                    console.error('获取文件信息失败:', error);
+                }
+            }
+
+            // 显示用户消息
+            chatBox.innerHTML += `<div class="user-msg">${prompt}</div>`;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // 创建空的 AI 消息容器（用于实时显示 Aider 输出）
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-msg';
+            const contentEl = document.createElement('div');
+            contentEl.className = 'ai-msg-content';
+            contentEl.innerHTML = '';
+            aiMsg.appendChild(contentEl);
+            chatBox.appendChild(aiMsg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // 调用 /api/run 启动 Aider
+            try {
+                const response = await fetch('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        run_mode: 'aider',
+                        project_id: currentProjectId,
+                        prompt: prompt,
+                        target_relative_path: targetRelativePath,
+                        source: 'chat',
+                        client_id: clientId,
+                        use_selected_context: !!aiderSelectedFileId
+                    })
+                });
+
+                const result = await safeJson(response);
+
+                if (!response.ok) {
+                    throw new Error(result.error || '启动 Aider 失败');
+                }
+
+                // 记录 Aider 聊天任务映射
+                aiderChatMap[result.execution_id] = {
+                    aiMsgEl: aiMsg,
+                    contentEl: contentEl,
+                    bufferText: '',
+                    prompt: prompt
+                };
+
+                // 创建运行任务记录
+                runningTasks[result.execution_id] = {
+                    isRunning: true,
+                    offset: 0,
+                    runBtn: null,
+                    runMode: 'aider',
+                    targetAbsPath: result.target_abs_path
+                };
+
+                // 开始轮询输出
+                pollOutput(result.execution_id, result.target_abs_path);
+
+            } catch (error) {
+                contentEl.innerHTML = `❌ 错误: ${error.message}`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
+        /**
          * 停止AI生成
          */
         function stopGeneration() {
@@ -2030,8 +2495,26 @@
             if (e.key === 'Enter') send();
         });
 
+        // 初始化聊天模式
+        domElements.chatModeSelect.value = chatMode;
+        updateInputPlaceholder();
+        
+        // 监听聊天模式变化
+        domElements.chatModeSelect.addEventListener('change', () => {
+            chatMode = domElements.chatModeSelect.value;
+            localStorage.setItem('chat_mode', chatMode);
+            updateInputPlaceholder();
+        });
+
+        // 更新输入框 placeholder
+        function updateInputPlaceholder() {
+            domElements.input.placeholder = '请输入...';
+        }
+
         // 初始化加载项目列表
         loadProjects();
     </script>
 </body>
 </html>
+
+

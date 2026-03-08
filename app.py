@@ -1,4 +1,4 @@
-import os
+﻿import os
 import dashscope
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
@@ -10,6 +10,8 @@ import signal
 import time
 import re
 import tempfile
+import atexit
+import datetime
 
 # 初始化Flask应用
 app = Flask(__name__)
@@ -34,6 +36,9 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'ai_code_manager.db')
 
 # 存储正在运行的代码执行进程
 running_processes = {}
+
+# 存储 Aider 上下文选择（key: (client_id, project_id) -> {file_id, relative_path, abs_path, updated_at}）
+aider_contexts = {}
 
 
 def modify_app_run(match_str):
@@ -66,6 +71,135 @@ def get_db_connection():
     # 启用外键约束
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+def normalize_path(p):
+    """规范化路径：abspath + normpath"""
+    return os.path.abspath(os.path.normpath(p))
+
+
+def is_under_root(path, root):
+    """校验路径是否在根目录内，使用 commonpath"""
+    path = normalize_path(path)
+    root = normalize_path(root)
+    try:
+        return os.path.commonpath([path, root]) == root
+    except ValueError:
+        return False
+
+
+def get_project_root(project_id):
+    """从 DB 获取项目 root_path"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute('SELECT root_path FROM projects WHERE id = ?', (project_id,))
+        row = cursor.fetchone()
+        return row['root_path'] if row else None
+    finally:
+        conn.close()
+
+
+def get_file_by_id(file_id):
+    """从 files 表获取文件记录"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM files WHERE id = ?', (file_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_client_id(data):
+    """读取 client_id，默认为 'default'"""
+    return data.get('client_id', 'default')
+
+
+def sync_project_files(project_id, root_path):
+    """
+    同步项目文件到数据库
+    - 扫描磁盘真实文件
+    - upsert 到 files 表
+    - 删除 DB 中已不存在的磁盘文件记录
+    返回: {"ok": True/False, "file_info_list": [...], "real_count": n, "deleted_count": m, "error": "..."}
+    """
+    import os as os_module
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 扫描目录，获取所有真实文件
+        real_files = set()
+        for dirpath, dirnames, filenames in os_module.walk(root_path):
+            # 跳过隐藏目录和 __pycache__
+            dirnames[:] = [d for d in dirnames if not d.startswith('.') and d != '__pycache__']
+            
+            for filename in filenames:
+                # 跳过隐藏文件
+                if filename.startswith('.'):
+                    continue
+                
+                abs_path = os_module.path.join(dirpath, filename)
+                relative_path = os_module.path.relpath(abs_path, root_path)
+                file_type = filename.split('.')[-1].lower() if '.' in filename else ''
+                file_size = os_module.path.getsize(abs_path)
+                
+                real_files.add(abs_path)
+                
+                # 检查文件是否已存在
+                cursor.execute('SELECT id FROM files WHERE file_path = ?', (abs_path,))
+                existing_file = cursor.fetchone()
+                
+                if existing_file:
+                    # 更新现有文件
+                    cursor.execute('''
+                        UPDATE files 
+                        SET filename = ?, relative_path = ?, file_type = ?, file_size = ?
+                        WHERE file_path = ?
+                    ''', (filename, relative_path, file_type, file_size, abs_path))
+                else:
+                    # 插入新文件
+                    cursor.execute('''
+                        INSERT INTO files (project_id, filename, file_path, relative_path, file_type, file_size)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (project_id, filename, abs_path, relative_path, file_type, file_size))
+        
+        # 删除 DB 里存在但磁盘不存在的记录
+        cursor.execute('SELECT file_path FROM files WHERE project_id = ?', (project_id,))
+        db_files = {row[0] for row in cursor.fetchall()}
+        files_to_delete = db_files - real_files
+        
+        for file_path in files_to_delete:
+            cursor.execute('DELETE FROM files WHERE file_path = ?', (file_path,))
+        
+        conn.commit()
+        
+        # 构建文件信息列表
+        file_info_list = []
+        cursor.execute('SELECT id, file_path, relative_path FROM files WHERE project_id = ?', (project_id,))
+        for row in cursor.fetchall():
+            file_info_list.append({
+                'file_id': row[0],
+                'file_path': row[1],
+                'relative_path': row[2]
+            })
+        
+        return {
+            'ok': True,
+            'file_info_list': file_info_list,
+            'real_count': len(real_files),
+            'deleted_count': len(files_to_delete)
+        }
+        
+    except Exception as e:
+        print(f"[DEBUG] 文件同步失败: {str(e)}", file=sys.stderr)
+        return {'ok': False, 'error': str(e)}
+    finally:
+        if conn:
+            conn.close()
 
 
 def init_database():
@@ -461,6 +595,204 @@ def delete_file(file_id):
     finally:
         conn.close()
 
+def run_aider_mode(execution_id, project_id, prompt, target_relative_path, source, client_id='default', use_selected_context=False):
+    """运行 Aider 模式（AI 代码编辑）"""
+    import os as os_module
+    import sys
+    
+    # 获取项目信息
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT root_path FROM projects WHERE id = ?', (project_id,))
+        project = cursor.fetchone()
+        
+        if not project:
+            return jsonify({'error': f'项目不存在: project_id={project_id}'}), 400
+        
+        root_path = project[0]
+        
+        # 校验项目 ID
+        if not project_id:
+            return jsonify({'error': 'project_id 不能为空'}), 400
+        
+        # 校验提示信息
+        if not prompt or not prompt.strip():
+            return jsonify({'error': 'prompt 不能为空'}), 400
+        
+        # 计算目标文件的绝对路径
+        if use_selected_context:
+            # 使用选中的上下文
+            if target_relative_path:
+                # 使用 commonpath 校验路径是否在项目根目录内
+                target_abs = os_module.path.abspath(os_module.path.join(root_path, target_relative_path))
+                
+                # 校验路径是否在项目根目录内（防止路径逃逸）
+                if not os_module.path.commonpath([root_path, target_abs]) == root_path:
+                    return jsonify({'error': f'目标路径必须在项目根目录内: {target_relative_path}'}), 400
+                
+                # 校验路径是否存在
+                if not os_module.path.exists(target_abs):
+                    return jsonify({'error': f'目标文件不存在: {target_relative_path}'}), 400
+                
+                # 校验是否为文件
+                if not os_module.path.isfile(target_abs):
+                    return jsonify({'error': f'目标路径必须是文件: {target_relative_path}'}), 400
+            else:
+                # 没有指定目标文件，从上下文中获取
+                context_key = (client_id, project_id)
+                context = aider_contexts.get(context_key)
+                if context:
+                    target_abs = context['abs_path']
+                    # 校验路径是否存在
+                    if not os_module.path.exists(target_abs):
+                        return jsonify({'error': f'上下文文件不存在: {context["relative_path"]}'}), 400
+                else:
+                    # 没有上下文，Aider 可以编辑项目内任意文件
+                    target_abs = None
+        else:
+            # 不使用上下文，直接按"无绑定模式"运行
+            target_abs = None
+        
+        # 创建临时文件来存储输出
+        temp_output_path = os_module.path.join(tempfile.gettempdir(), f'aider_output_{execution_id}.txt')
+        
+        # 检查 API Key（兼容 OPENAI_API_KEY / DEEPSEEK_API_KEY）
+        api_key = (
+            os_module.environ.get('OPENAI_API_KEY')
+            or os_module.environ.get('DEEPSEEK_API_KEY')
+            or ''
+        ).strip()
+        
+        if not api_key:
+            return jsonify({'error': '未设置 OPENAI_API_KEY 或 DEEPSEEK_API_KEY 环境变量'}), 400
+        
+        # 清理环境变量
+        clean_env = os_module.environ.copy()
+        env_vars_to_remove = ['WERKZEUG_RUN_MAIN', 'WERKZEUG_SERVER_FD', 'FLASK_RUN_FROM_CLI']
+        for var in env_vars_to_remove:
+            clean_env.pop(var, None)
+        
+        # 强制统一到 OpenAI 兼容 DeepSeek
+        clean_env['OPENAI_API_KEY'] = api_key
+        clean_env['OPENAI_API_BASE'] = 'https://api.deepseek.com'
+        clean_env['PYTHONUNBUFFERED'] = '1'  # 确保 Python 输出不被缓冲
+        clean_env.pop('AIDER_MODEL', None)  # 避免被旧环境变量覆盖成 deepseek-chat
+        
+        # 使用子进程执行 Aider
+        try:
+            # 构建 aider 命令
+            aider_cmd = [
+                sys.executable, '-m', 'aider',
+                '--message', prompt,
+                '--yes-always',  # 自动确认所有提示
+                '--no-gitignore',  # 不使用 .gitignore
+                '--exit',  # 完成后自动退出
+                '--no-fancy-input',
+                '--no-pretty',
+                '--no-show-model-warnings',
+                '--no-git',
+                '--model', 'openai/deepseek-chat',
+                '--openai-api-base', 'https://api.deepseek.com',
+                '--openai-api-key', api_key,
+            ]
+            
+            # 只有当 target_abs 存在时，才添加 --file 参数
+            if target_abs:
+                aider_cmd.extend(['--file', target_abs])
+            
+            # 打开临时文件用于写入输出（使用行缓冲和 GBK 编码）
+            temp_output_file = open(temp_output_path, 'w', encoding='gbk', buffering=1)
+            
+            # 设置工作目录（Windows 下使用 CREATE_NEW_PROCESS_GROUP）
+            if os_module.name == 'nt':
+                process = subprocess.Popen(
+                    aider_cmd,
+                    cwd=root_path,
+                    stdout=temp_output_file,
+                    stderr=subprocess.STDOUT,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                    env=clean_env,
+                    bufsize=1  # 行缓冲
+                )
+            else:
+                process = subprocess.Popen(
+                    aider_cmd,
+                    cwd=root_path,
+                    stdout=temp_output_file,
+                    stderr=subprocess.STDOUT,
+                    env=clean_env,
+                    bufsize=1  # 行缓冲
+                )
+            
+            # 关闭文件句柄（子进程会保持打开）
+            temp_output_file.close()
+            
+            # 存储进程引用和临时文件路径
+            running_processes[execution_id] = {
+                'process': process,
+                'temp_output_path': temp_output_path,
+                'temp_code_path': None,
+                'temp_user_code_path': None,  # Aider 模式不使用 temp_user_code_path（避免删除真实项目文件）
+                'task_type': 'aider',
+                'is_web_service': False,
+                'start_time': time.time(),
+                'run_mode': 'aider',
+                'cwd': root_path,
+                'script_path': target_abs if target_relative_path else None,
+                'project_id': project_id,
+                'source': source,
+                'prompt': prompt,
+                'target_relative_path': target_relative_path
+            }
+            
+            # 启动后台线程：进程结束即同步
+            import threading
+            def sync_after_aider_finish():
+                """Aider 进程结束后自动同步文件"""
+                try:
+                    process.wait()
+                    print(f"[DEBUG] Aider 进程结束，开始同步项目 {project_id} 的文件")
+                    result = sync_project_files(project_id, root_path)
+                    if result['ok']:
+                        print(f"[DEBUG] Aider 后同步完成: 新增/更新 {result['real_count']} 个文件，删除 {result['deleted_count']} 个文件")
+                    else:
+                        print(f"[DEBUG] Aider 后同步失败: {result.get('error', '未知错误')}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[DEBUG] Aider 后同步线程异常: {str(e)}", file=sys.stderr)
+            
+            sync_thread = threading.Thread(target=sync_after_aider_finish, daemon=True)
+            sync_thread.start()
+            
+            # 立即返回，让 Aider 在后台运行
+            output_message = f'🤖 Aider 已启动（后台运行中）'
+            if target_relative_path:
+                output_message += f'\n📄 目标文件: {target_relative_path}'
+            
+            return jsonify({
+                'output': output_message,
+                'execution_id': execution_id,
+                'running': True,
+                'is_web_service': False,
+                'run_mode': 'aider',
+                'target_abs_path': target_abs
+            })
+                
+        except Exception as e:
+            # 清理临时文件
+            try:
+                os_module.unlink(temp_output_path)
+            except:
+                pass
+            
+            # 清理进程引用
+            if execution_id in running_processes:
+                del running_processes[execution_id]
+            
+            return jsonify({'error': f"启动失败: {str(e)}"}), 500
+    finally:
+        conn.close()
+
 def run_project_file(execution_id, script_path, cwd, project_id, source):
     """运行项目文件（project模式）"""
     import os as os_module
@@ -484,11 +816,16 @@ def run_project_file(execution_id, script_path, cwd, project_id, source):
     
     # 使用子进程执行项目文件（Windows上设置进程组以便终止整个进程树）
     try:
+        # 打开临时文件用于写入输出
+        temp_output_file = open(temp_output_path, 'w', encoding='utf-8')
+        
         if os_module.name == 'nt':
             # Windows: 创建新进程组
             process = subprocess.Popen(
                 [sys.executable, '-u', script_path],
                 cwd=cwd,
+                stdout=temp_output_file,
+                stderr=subprocess.STDOUT,  # 将 stderr 重定向到 stdout
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
                 env=clean_env
             )
@@ -497,9 +834,14 @@ def run_project_file(execution_id, script_path, cwd, project_id, source):
             process = subprocess.Popen(
                 [sys.executable, '-u', script_path],
                 cwd=cwd,
+                stdout=temp_output_file,
+                stderr=subprocess.STDOUT,  # 将 stderr 重定向到 stdout
                 preexec_fn=os_module.setsid,
                 env=clean_env
             )
+        
+        # 关闭文件句柄（子进程会保持打开）
+        temp_output_file.close()
         
         # 检测是否为Web服务
         is_web_service = detect_web_service(script_path)
@@ -673,13 +1015,16 @@ def run_code():
     import os as os_module
     
     data = request.json
-    run_mode = data.get('run_mode', 'snippet')  # snippet 或 project
+    run_mode = data.get('run_mode', 'snippet')  # snippet、project 或 aider
     code = data.get('code', '')
     language = data.get('language', 'python')
     script_path = data.get('script_path', '')
     cwd = data.get('cwd', '')
     project_id = data.get('project_id', '')
     source = data.get('source', 'editor')  # editor 或 chat
+    prompt = data.get('prompt', '')  # Aider 模式的提示
+    target_relative_path = data.get('target_relative_path', '')  # Aider 模式的目标文件相对路径
+    use_selected_context = data.get('use_selected_context', False)  # 是否使用选中的 Aider 上下文
     
     # 生成唯一的执行ID
     execution_id = str(uuid.uuid4())
@@ -687,6 +1032,11 @@ def run_code():
     # Project 模式：直接运行项目文件
     if run_mode == 'project':
         return run_project_file(execution_id, script_path, cwd, project_id, source)
+    
+    # Aider 模式：使用 Aider 编辑代码
+    if run_mode == 'aider':
+        client_id = get_client_id(data)
+        return run_aider_mode(execution_id, project_id, prompt, target_relative_path, source, client_id, use_selected_context)
     
     # Snippet 模式：运行代码片段（原有逻辑）
     if not code:
@@ -956,6 +1306,14 @@ def stop_code():
                         # 忽略WinError 10038（进程已结束）和其他预期的错误
                         if hasattr(e, 'winerror') and e.winerror != 10038:
                             raise
+                    
+                    # Windows 兜底：使用 taskkill 强制终止进程树
+                    if process.poll() is None:
+                        try:
+                            subprocess.run(['taskkill', '/T', '/F', '/PID', str(process.pid)], 
+                                       capture_output=True, timeout=5)
+                        except:
+                            pass
                 else:
                     # Unix/Linux: 终止整个进程组
                     try:
@@ -975,13 +1333,29 @@ def stop_code():
                 except:
                     output = "⏹️ 代码已停止"
             
-            # 清理临时文件
+            # Aider 模式：手动停止后也执行一次文件同步
+            run_mode = proc_info.get('run_mode', 'snippet')
+            if run_mode == 'aider':
+                project_id = proc_info.get('project_id')
+                cwd = proc_info.get('cwd', '')
+                if project_id and cwd:
+                    print(f"[DEBUG] Aider 手动停止，开始同步项目 {project_id} 的文件")
+                    sync_result = sync_project_files(project_id, cwd)
+                    if sync_result['ok']:
+                        print(f"[DEBUG] Aider 手动停止后同步完成: 新增/更新 {sync_result['real_count']} 个文件，删除 {sync_result['deleted_count']} 个文件")
+                        # 在输出中追加同步信息
+                        output += f"\n\n✅ 已同步 {sync_result['real_count']} 个文件到数据库"
+                    else:
+                        print(f"[DEBUG] Aider 手动停止后同步失败: {sync_result.get('error', '未知错误')}", file=sys.stderr)
+            
+            # 清理临时文件（只删除临时文件，不删除项目真实文件）
             try:
                 if temp_output_path and os_module.path.exists(temp_output_path):
                     os_module.unlink(temp_output_path)
                 if temp_code_path and os_module.path.exists(temp_code_path):
                     os_module.unlink(temp_code_path)
-                if temp_user_code_path and os_module.path.exists(temp_user_code_path):
+                # temp_user_code_path 只在 snippet 模式下是临时文件，project 和 aider 模式不使用
+                if run_mode == 'snippet' and temp_user_code_path and os_module.path.exists(temp_user_code_path):
                     os_module.unlink(temp_user_code_path)
                 input_file = temp_output_path + '.input'
                 if os_module.path.exists(input_file):
@@ -1039,22 +1413,72 @@ def get_output():
         
         # 检查进程是否还在运行
         if process.poll() is not None:
-            # 进程已结束，读取输出并清理
+            # 进程已结束，读取增量输出并清理
             try:
-                with open(temp_output_path, 'r', encoding='utf-8') as f:
-                    output = f.read()
-                if not output:
-                    output = "✅ 代码执行完成（无输出）"
-            except:
-                output = "✅ 代码执行完成（无输出）"
+                # 获取offset参数（用于增量读取）
+                offset = data.get('offset', 0)
+                
+                # 尝试多种编码读取输出文件（增量）
+                output = None
+                new_offset = offset
+                for encoding in ['gbk', 'utf-8', 'gb2312', 'utf-16']:
+                    try:
+                        with open(temp_output_path, 'r', encoding=encoding) as f:
+                            # 跳过已读取的内容
+                            if offset > 0:
+                                f.seek(offset)
+                            # 读取新增内容
+                            output = f.read()
+                            # 返回新的offset（文件当前位置）
+                            new_offset = f.tell()
+                        print(f"[DEBUG] 成功使用 {encoding} 编码读取 Aider 输出（增量完成）")
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                    except Exception as e:
+                        print(f"[DEBUG] 使用 {encoding} 编码读取失败: {e}")
+                        continue
+                
+                if output is None:
+                    output = ""
+                    new_offset = offset
+                
+                # 调试信息
+                print(f"[DEBUG] Aider 输出文件路径: {temp_output_path}")
+                print(f"[DEBUG] Aider 增量输出长度: {len(output)}")
+                print(f"[DEBUG] Aider 增量输出前500字符: {output[:500]}")
+            except Exception as e:
+                print(f"[DEBUG] 读取 Aider 输出文件失败: {e}")
+                output = f"❌ 读取输出失败: {e}"
+                new_offset = data.get('offset', 0)
             
-            # 清理临时文件
+            # Aider 模式：扫描目录落库同步（双保险，后台线程已同步，这里再次同步确保前端获取最新）
+            file_info_list = []
+            if proc_info.get('run_mode') == 'aider':
+                project_id = proc_info.get('project_id')
+                root_path = proc_info.get('cwd', '')
+                
+                if project_id and root_path:
+                    result = sync_project_files(project_id, root_path)
+                    if result['ok']:
+                        file_info_list = result['file_info_list']
+                        print(f"[DEBUG] /api/output 同步完成: 新增/更新 {result['real_count']} 个文件，删除 {result['deleted_count']} 个文件")
+                        # 将文件信息添加到响应中
+                        if output:
+                            output += f'\n\n✅ Aider 完成，已同步 {result["real_count"]} 个文件'
+                        else:
+                            output = f'✅ Aider 完成，已同步 {result["real_count"]} 个文件'
+                    else:
+                        print(f"[DEBUG] /api/output 同步失败: {result.get('error', '未知错误')}", file=sys.stderr)
+            
+            # 清理临时文件（只删除临时文件，不删除项目真实文件）
             try:
                 if temp_output_path and os_module.path.exists(temp_output_path):
                     os_module.unlink(temp_output_path)
                 if proc_info['temp_code_path'] and os_module.path.exists(proc_info['temp_code_path']):
                     os_module.unlink(proc_info['temp_code_path'])
-                if 'temp_user_code_path' in proc_info and proc_info['temp_user_code_path'] and os_module.path.exists(proc_info['temp_user_code_path']):
+                # temp_user_code_path 只在 snippet 模式下是临时文件，project 和 aider 模式不使用
+                if proc_info.get('run_mode') == 'snippet' and 'temp_user_code_path' in proc_info and proc_info['temp_user_code_path'] and os_module.path.exists(proc_info['temp_user_code_path']):
                     os_module.unlink(proc_info['temp_user_code_path'])
                 input_file = temp_output_path + '.input'
                 if os_module.path.exists(input_file):
@@ -1065,27 +1489,51 @@ def get_output():
             # 清理进程引用
             del running_processes[execution_id]
             
-            return jsonify({'output': output, 'running': False})
+            # 构建响应
+            response_data = {'output': output, 'running': False, 'offset': new_offset}
+            
+            # Aider 模式：添加文件信息
+            if proc_info.get('run_mode') == 'aider' and 'file_info_list' in locals() and file_info_list:
+                response_data['changed_files'] = file_info_list
+                # 不设置 primary_file_id，让前端自己选择
+            
+            return jsonify(response_data)
         else:
             # 进程还在运行，持续读取当前输出
             try:
                 # 获取offset参数（用于增量读取）
                 offset = data.get('offset', 0)
                 
-                with open(temp_output_path, 'r', encoding='utf-8') as f:
-                    # 跳过已读取的内容
-                    if offset > 0:
-                        f.seek(offset)
-                    # 读取新增内容
-                    output = f.read()
-                    # 返回新的offset（文件当前位置）
-                    new_offset = f.tell()
+                # 尝试多种编码读取输出文件
+                output = None
+                for encoding in ['gbk', 'utf-8', 'gb2312', 'utf-16']:
+                    try:
+                        with open(temp_output_path, 'r', encoding=encoding) as f:
+                            # 跳过已读取的内容
+                            if offset > 0:
+                                f.seek(offset)
+                            # 读取新增内容
+                            output = f.read()
+                            # 返回新的offset（文件当前位置）
+                            new_offset = f.tell()
+                        print(f"[DEBUG] 成功使用 {encoding} 编码读取 Aider 输出（增量）")
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                    except Exception as e:
+                        print(f"[DEBUG] 使用 {encoding} 编码读取失败: {e}")
+                        continue
+                
+                if output is None:
+                    output = ""
+                    new_offset = offset
                 
                 # 如果没有新输出，返回空字符串
                 if not output:
                     output = ""
                     new_offset = offset
-            except:
+            except Exception as e:
+                print(f"[DEBUG] 读取 Aider 输出文件失败: {e}")
                 output = ""
                 new_offset = data.get('offset', 0)
             
@@ -1094,6 +1542,137 @@ def get_output():
     return jsonify({'error': '未找到正在运行的代码'}), 404
 
 
+@app.route('/api/aider/context/select', methods=['POST'])
+def select_aider_context():
+    """选择 Aider 上下文文件"""
+    data = request.get_json()
+    client_id = data.get('client_id', 'default')
+    project_id = data.get('project_id')
+    file_id = data.get('file_id')
+
+    if not project_id or not file_id:
+        return jsonify({'error': '缺少必要参数'}), 400
+
+    # 统一转换为 int 类型
+    try:
+        project_id = int(project_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'project_id 必须是整数'}), 400
+
+    try:
+        file_id = int(file_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'file_id 必须是整数'}), 400
+
+    project_root = get_project_root(project_id)
+    if not project_root:
+        return jsonify({'error': '项目不存在'}), 404
+
+    file_record = get_file_by_id(file_id)
+    if not file_record:
+        return jsonify({'error': '文件不存在'}), 404
+
+    if file_record['project_id'] != project_id:
+        return jsonify({'error': '文件不属于该项目'}), 400
+
+    file_path = file_record['file_path']
+    if not is_under_root(file_path, project_root):
+        return jsonify({'error': '文件路径不在项目根目录内'}), 400
+
+    context_key = (client_id, project_id)
+    aider_contexts[context_key] = {
+        'file_id': file_id,
+        'relative_path': file_record['relative_path'],
+        'abs_path': file_path,
+        'updated_at': datetime.datetime.now().isoformat()
+    }
+
+    return jsonify({
+        'ok': True,
+        'selected': {
+            'file_id': file_id,
+            'relative_path': file_record['relative_path'],
+            'file_path': file_path
+        }
+    })
+
+
+@app.route('/api/aider/context', methods=['GET'])
+def get_aider_context():
+    """查询 Aider 上下文文件"""
+    client_id = request.args.get('client_id', 'default')
+    project_id = request.args.get('project_id')
+
+    if not project_id:
+        return jsonify({'error': '缺少必要参数'}), 400
+
+    # 统一转换为 int 类型
+    try:
+        project_id = int(project_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'project_id 必须是整数'}), 400
+
+    context_key = (client_id, project_id)
+    context = aider_contexts.get(context_key)
+
+    if context:
+        return jsonify({
+            'ok': True,
+            'selected': {
+                'file_id': context['file_id'],
+                'relative_path': context['relative_path'],
+                'file_path': context['abs_path']
+            }
+        })
+    else:
+        return jsonify({'ok': True, 'selected': None})
+
+
+@app.route('/api/aider/context/clear', methods=['POST'])
+def clear_aider_context():
+    """清空 Aider 上下文文件"""
+    data = request.get_json()
+    client_id = data.get('client_id', 'default')
+    project_id = data.get('project_id')
+
+    if not project_id:
+        return jsonify({'error': '缺少必要参数'}), 400
+
+    # 统一转换为 int 类型
+    try:
+        project_id = int(project_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'project_id 必须是整数'}), 400
+
+    context_key = (client_id, project_id)
+    if context_key in aider_contexts:
+        del aider_contexts[context_key]
+
+    return jsonify({'ok': True})
+
+
+def cleanup_aider_processes():
+    """清理所有 Aider 子进程（Flask 退出时调用）"""
+    import os as os_module
+    for execution_id, proc_info in list(running_processes.items()):
+        if proc_info.get('run_mode') == 'aider':
+            process = proc_info.get('process')
+            if process and process.poll() is None:
+                try:
+                    if os_module.name == 'nt':
+                        # Windows: 使用 taskkill 强制终止进程树
+                        subprocess.run(['taskkill', '/T', '/F', '/PID', str(process.pid)],
+                                   capture_output=True, timeout=5)
+                    else:
+                        # Unix/Linux: 终止进程组
+                        os_module.killpgid(os_module.getpgid(process.pid), signal.SIGTERM)
+                except:
+                    pass
+
+
 if __name__ == '__main__':
     """启动应用"""
+    # 注册退出清理函数
+    atexit.register(cleanup_aider_processes)
+    
     socketio.run(app, debug=False, host='0.0.0.0', port=5000)
