@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -228,8 +228,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 0 20px 20px 0;
+            background: linear-gradient(180deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
         }
 
         .ai-sidebar {
@@ -264,7 +263,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            background: white;
+            background: linear-gradient(180deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
         }
 
         .welcome-message {
@@ -273,7 +272,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.02) 0%, rgba(236, 72, 153, 0.02) 100%);
+            background: linear-gradient(180deg, rgba(139, 92, 246, 0.02) 0%, rgba(236, 72, 153, 0.02) 100%);
             text-align: center;
             padding: 40px;
         }
@@ -397,8 +396,8 @@
 
         .terminal-panel {
             height: 250px;
-            background: #1e1e1e;
-            border-top: 1px solid rgba(139, 92, 246, 0.3);
+            background: #fff;
+            border-top: 1px solid rgba(139, 92, 246, 0.1);
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -406,20 +405,20 @@
 
         .terminal-header {
             padding: 10px 16px;
-            background: #2d2d2d;
-            color: #fff;
+            background: #fff;
+            color: #4b5563;
             font-size: 14px;
             font-weight: 600;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+            border-bottom: 1px solid rgba(139, 92, 246, 0.1);
         }
 
         .terminal-clear-btn {
-            background: rgba(139, 92, 246, 0.3);
+            background: rgba(139, 92, 246, 0.1);
             border: none;
-            color: white;
+            color: #4b5563;
             padding: 4px 12px;
             border-radius: 4px;
             cursor: pointer;
@@ -428,7 +427,7 @@
         }
 
         .terminal-clear-btn:hover {
-            background: rgba(139, 92, 246, 0.5);
+            background: rgba(139, 92, 246, 0.2);
         }
 
         .terminal-output {
@@ -438,13 +437,15 @@
             font-family: 'Consolas', 'Monaco', monospace;
             font-size: 13px;
             line-height: 1.5;
-            color: #d4d4d4;
+            background: #fff;
+            color: #4b5563;
         }
 
         .terminal-output .log {
             margin: 4px 0;
             white-space: pre-wrap;
             word-break: break-all;
+            color: #111827;
         }
 
         .service-btn {
@@ -459,15 +460,15 @@
         }
 
         .terminal-output .log.error {
-            color: #f87171;
+            color: #dc2626;
         }
 
         .terminal-output .log.success {
-            color: #4ade80;
+            color: #111827;
         }
 
         .terminal-output .log.info {
-            color: #60a5fa;
+            color: #111827;
         }
 
         .user-msg, .ai-msg {
@@ -540,33 +541,68 @@
             z-index: 1;
         }
 
-        #chatModeSelect {
-            padding: 8px 10px;
+        /* 聊天模式选择器包装器 */
+        .chat-mode-wrapper {
+            position: relative;
+            width: 44px;
+            height: 44px;
+        }
+
+        /* 聊天模式图标（显示层） */
+        .chat-mode-icon {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 聊天模式选择器（透明点击层） */
+        .chat-mode-select {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 44px;
+            height: 44px;
+            padding: 0;
             border: 2px solid rgba(139, 92, 246, 0.2);
-            border-radius: 8px;
-            font-size: 20px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.9);
-            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
-            cursor: pointer;
-            min-width: 42px;
-            max-width: 42px;
-            height: 42px;
+            border-radius: 10px;
+            background: transparent;
+            color: transparent;
+            font-size: 22px;
+            line-height: 1;
             text-align: center;
-            color: #4b5563;
+            text-align-last: center;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            z-index: 2;
+            opacity: 0;
         }
 
-        #chatModeSelect:hover {
+        .chat-mode-select:hover {
             border-color: rgba(139, 92, 246, 0.4);
-            background: rgba(255, 255, 255, 1);
         }
 
-        #chatModeSelect:focus {
+        .chat-mode-select:focus {
             outline: none;
             border-color: #8b5cf6;
-            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1), inset 0 2px 8px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
             transform: translateY(-1px);
+        }
+
+        .chat-mode-select option {
+            color: #111;
+            font-size: 14px;
+            background: #fff;
         }
 
         #input {
@@ -760,12 +796,20 @@
             .save-code-btn { right: calc(6px + 40px + 6px); }
             .code-run-btn { right: calc(6px + 40px + 6px + 40px + 6px); }
             
-            #chatModeSelect {
-                min-width: 36px;
-                max-width: 36px;
-                padding: 6px 8px;
-                font-size: 18px;
-                height: 36px;
+            .chat-mode-wrapper {
+                width: 44px;
+                height: 44px;
+            }
+
+            .chat-mode-icon {
+                width: 44px;
+                height: 44px;
+                font-size: 22px;
+            }
+
+            .chat-mode-select {
+                width: 44px;
+                height: 44px;
             }
             
             .input-area {
@@ -848,10 +892,13 @@
             </div>
             <div class="chat-box" id="chatBox"></div>
             <div class="input-area">
-                <select id="chatModeSelect">
-                    <option value="ai">🐻</option>
-                    <option value="aider">🤖</option>
-                </select>
+                <div class="chat-mode-wrapper">
+                    <span id="chatModeIcon" class="chat-mode-icon">🐻</span>
+                    <select id="chatModeSelect" class="chat-mode-select">
+                        <option value="ai">🐻</option>
+                        <option value="aider">🤖</option>
+                    </select>
+                </div>
                 <input id="input" placeholder="请输入...">
                 <div class="btn-group">
                     <button id="send" onclick="send()">发送</button>
@@ -1059,8 +1106,54 @@
         const clientId = getClientId();
         let aiderSelectedFileId = null;  // 当前项目下选中的文件 id
         
-        // 聊天模式管理
-        let chatMode = localStorage.getItem('chat_mode') || 'ai';  // 'ai' 或 'aider'
+        // 聊天模式管理常量
+        const CHAT_MODE_KEY = 'chat_mode';
+        const DEFAULT_CHAT_MODE = 'ai';
+        const ALLOWED_CHAT_MODES = new Set(['ai', 'aider']);
+        
+        // 全局聊天模式变量
+        let chatMode = DEFAULT_CHAT_MODE;
+        
+        /**
+         * 渲染聊天模式图标
+         * @param {string} mode - 聊天模式
+         */
+        function renderChatModeIcon(mode) {
+            const iconEl = document.getElementById('chatModeIcon');
+            if (!iconEl) return;
+            
+            if (mode === 'ai') {
+                iconEl.textContent = '🐻';
+            } else if (mode === 'aider') {
+                iconEl.textContent = '🤖';
+            } else {
+                iconEl.textContent = '🐻';
+            }
+        }
+        
+        /**
+         * 应用聊天模式（统一入口）
+         * @param {string} mode - 要应用的模式
+         * @param {boolean} persist - 是否持久化到 localStorage（已废弃，始终 false）
+         */
+        function applyChatMode(mode, persist = false) {
+            // 归一化 mode（仅允许 ai/aider）
+            const normalizedMode = ALLOWED_CHAT_MODES.has(mode) ? mode : DEFAULT_CHAT_MODE;
+            
+            // 赋值给全局变量
+            chatMode = normalizedMode;
+            
+            // 同步下拉框值
+            if (domElements.chatModeSelect) {
+                domElements.chatModeSelect.value = normalizedMode;
+            }
+            
+            // 渲染图标
+            renderChatModeIcon(normalizedMode);
+            
+            // 更新 placeholder
+            updateInputPlaceholder();
+        }
         
         // 服务管理
         const runningServices = {};
@@ -1079,11 +1172,18 @@
             input: document.getElementById('input')
         };
 
+        // 页面启动时清除旧的 chat_mode 数据
+        try {
+            localStorage.removeItem('chat_mode');
+        } catch (e) {
+            console.warn('清除旧 chat_mode 数据失败:', e);
+        }
+
         // 初始化Monaco编辑器
         require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
         require(['vs/editor/editor.main'], function() {
             editor = monaco.editor.create(document.getElementById('editor'), {
-                theme: 'vs-dark',
+                theme: 'vs',
                 automaticLayout: true,
                 fontSize: 14,
                 minimap: { enabled: true },
@@ -1093,15 +1193,56 @@
         });
 
         /**
+         * 安全解析 JSON（防止 response.json() 崩溃）
+         * @param {Response} response - Fetch 响应对象
+         * @returns {Promise<Object>} - 解析后的 JSON 对象，失败返回 null
+         */
+        async function safeJson(response) {
+            try {
+                const text = await response.text();
+                if (!text || !text.trim()) {
+                    return null;
+                }
+                return JSON.parse(text);
+            } catch (error) {
+                console.error('JSON 解析失败:', error);
+                return null;
+            }
+        }
+
+        /**
+         * 获取并检查 JSON 响应（统一错误处理）
+         * @param {string} url - 请求 URL
+         * @param {Object} options - Fetch 选项
+         * @returns {Promise<Object>} - 解析后的 JSON 对象
+         * @throws {Error} - 当响应不成功或 JSON 解析失败时抛出错误
+         */
+        async function fetchJsonChecked(url, options = {}) {
+            const response = await fetch(url, options);
+            const data = await safeJson(response);
+            
+            if (!response.ok) {
+                const errorMsg = data && data.error ? data.error : `请求失败: ${response.status}`;
+                throw new Error(errorMsg);
+            }
+            
+            if (!data) {
+                throw new Error('响应数据无效');
+            }
+            
+            return data;
+        }
+
+        /**
          * 加载项目列表
          */
         async function loadProjects() {
             try {
-                const response = await fetch('/api/projects');
-                projects = await response.json();
+                projects = await fetchJsonChecked('/api/projects');
                 renderProjectList();
             } catch (error) {
                 console.error('加载项目失败:', error);
+                showToast('加载项目失败：' + error.message, 'error');
             }
         }
 
@@ -1140,8 +1281,7 @@
             renderProjectList();
 
             try {
-                const response = await fetch(`/api/projects/${projectId}/files`);
-                const files = await response.json();
+                const files = await fetchJsonChecked(`/api/projects/${projectId}/files`);
                 
                 // 先加载 Aider 上下文
                 await fetchAiderContext();
@@ -1150,6 +1290,7 @@
                 renderFileTree(files);
             } catch (error) {
                 console.error('加载文件失败:', error);
+                showToast('加载文件失败：' + error.message, 'error');
             }
         }
 
@@ -1164,24 +1305,19 @@
             }
 
             try {
-                const response = await fetch(`/api/projects/${projectId}`, {
+                await fetchJsonChecked(`/api/projects/${projectId}`, {
                     method: 'DELETE'
                 });
 
-                const result = await response.json();
-                if (response.ok) {
-                    alert('项目删除成功！');
-                    // 如果删除的是当前选中的项目，清空当前项目
-                    if (currentProjectId === projectId) {
-                        currentProjectId = null;
-                        currentFileId = null;
-                        document.getElementById('fileTree').style.display = 'none';
-                    }
-                    // 刷新项目列表
-                    loadProjects();
-                } else {
-                    alert('删除失败：' + result.error);
+                alert('项目删除成功！');
+                // 如果删除的是当前选中的项目，清空当前项目
+                if (currentProjectId === projectId) {
+                    currentProjectId = null;
+                    currentFileId = null;
+                    document.getElementById('fileTree').style.display = 'none';
                 }
+                // 刷新项目列表
+                loadProjects();
             } catch (error) {
                 console.error('删除项目失败:', error);
                 alert('删除失败：' + error.message);
@@ -1236,50 +1372,39 @@
          */
         async function openFile(fileId) {
             try {
-                const response = await fetch(`/api/files/${fileId}`);
-                const fileData = await response.json();
+                const fileData = await fetchJsonChecked(`/api/files/${fileId}`);
 
-                if (response.ok) {
-                    currentFileId = fileId;
-                    showEditor(fileData);
+                currentFileId = fileId;
+                showEditor(fileData);
+                
+                // 检查是否二次点击同一文件
+                if (fileId === aiderSelectedFileId) {
+                    // 二次点击：取消 Aider 上下文绑定
+                    await clearAiderContext();
+                    aiderSelectedFileId = null;
                     
-                    // 检查是否二次点击同一文件
-                    if (fileId === aiderSelectedFileId) {
-                        // 二次点击：取消 Aider 上下文绑定
-                        await clearAiderContext();
-                        aiderSelectedFileId = null;
-                        
-                        // 刷新文件树高亮（取消绿色选中）
-                        if (currentProjectId) {
-                            const filesResponse = await fetch(`/api/projects/${currentProjectId}/files`);
-                            if (filesResponse.ok) {
-                                const files = await filesResponse.json();
-                                renderFileTree(files);
-                            }
-                        }
-                        
-                        // 轻提示
-                        showToast('已取消 Aider 上下文绑定', 'info');
-                    } else {
-                        // 第一次点击：添加到 Aider 上下文
-                        await selectAiderContext(fileId);
-                        aiderSelectedFileId = fileId;
-                        
-                        // 刷新文件树高亮
-                        if (currentProjectId) {
-                            const filesResponse = await fetch(`/api/projects/${currentProjectId}/files`);
-                            if (filesResponse.ok) {
-                                const files = await filesResponse.json();
-                                renderFileTree(files);
-                            }
-                        }
+                    // 刷新文件树高亮（取消绿色选中）
+                    if (currentProjectId) {
+                        const files = await fetchJsonChecked(`/api/projects/${currentProjectId}/files`);
+                        renderFileTree(files);
                     }
+                    
+                    // 轻提示
+                    showToast('已取消 Aider 上下文绑定', 'info');
                 } else {
-                    alert('加载文件失败：' + fileData.error);
+                    // 第一次点击：添加到 Aider 上下文
+                    await selectAiderContext(fileId);
+                    aiderSelectedFileId = fileId;
+                    
+                    // 刷新文件树高亮
+                    if (currentProjectId) {
+                        const files = await fetchJsonChecked(`/api/projects/${currentProjectId}/files`);
+                        renderFileTree(files);
+                    }
                 }
             } catch (error) {
                 console.error('打开文件失败:', error);
-                alert('打开文件失败：' + error.message);
+                showToast('打开文件失败：' + error.message, 'error');
             }
         }
 
@@ -1294,23 +1419,18 @@
             }
 
             try {
-                const response = await fetch(`/api/files/${fileId}`, {
+                await fetchJsonChecked(`/api/files/${fileId}`, {
                     method: 'DELETE'
                 });
 
-                const result = await response.json();
-                if (response.ok) {
-                    alert('文件删除成功！');
-                    // 刷新文件列表
-                    if (currentProjectId) {
-                        selectProject(currentProjectId);
-                    }
-                } else {
-                    alert('删除失败：' + result.error);
+                showToast('文件删除成功！', 'success');
+                // 刷新文件列表
+                if (currentProjectId) {
+                    selectProject(currentProjectId);
                 }
             } catch (error) {
                 console.error('删除文件失败:', error);
-                alert('删除失败：' + error.message);
+                showToast('删除失败：' + error.message, 'error');
             }
         }
 
@@ -1365,6 +1485,46 @@
         }
 
         /**
+         * 刷新当前编辑器文件内容（无副作用，不改变 Aider 上下文）
+         * 用于 Aider 完成后自动刷新编辑器显示
+         */
+        async function refreshCurrentEditorFile() {
+            if (!currentFileId || !editor) return;
+            
+            // 检查是否有未保存的本地改动
+            if (isEditorDirty()) {
+                console.log('[DEBUG] 编辑器有未保存改动，跳过自动刷新');
+                showToast('文件有未保存改动，请手动刷新', 'info');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/files/${currentFileId}`);
+                const fileData = await safeJson(response);
+                
+                if (response.ok && fileData) {
+                    // 保存当前光标位置
+                    const position = editor.getPosition();
+                    
+                    // 更新编辑器内容
+                    editor.setValue(fileData.content);
+                    
+                    // 恢复光标位置（如果可能）
+                    if (position) {
+                        editor.setPosition(position);
+                    }
+                    
+                    // 更新当前文件数据
+                    currentFileData = fileData;
+                    
+                    console.log('[DEBUG] 编辑器内容已刷新');
+                }
+            } catch (error) {
+                console.error('刷新编辑器内容失败:', error);
+            }
+        }
+
+        /**
          * 新建文件
          */
         async function createNewFile() {
@@ -1383,7 +1543,7 @@
             }
 
             try {
-                const response = await fetch('/api/files', {
+                const result = await fetchJsonChecked('/api/files', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1395,38 +1555,42 @@
                     })
                 });
 
-                const result = await response.json();
-                if (response.ok) {
-                    // 显示编辑器
-                    editorMode = true;
-                    currentFileId = result.id;
-                    domElements.welcomeMessage.style.display = 'none';
-                    domElements.editorContainer.style.display = 'flex';
-                    domElements.editorFileName.textContent = filename;
-                    domElements.editorFileIcon.textContent = getFileIcon(filename);
-                    
-                    // 清空编辑器
-                    if (editor) {
-                        editor.setValue('');
-                        const ext = filename.split('.').pop().toLowerCase();
-                        const langMap = {
-                            'py': 'python', 'js': 'javascript', 'html': 'html', 'css': 'css',
-                            'json': 'json', 'md': 'markdown', 'java': 'java', 'cpp': 'cpp'
-                        };
-                        monaco.editor.setModelLanguage(editor.getModel(), langMap[ext] || 'plaintext');
-                    }
-                    
-                    // 刷新文件列表
-                    selectProject(currentProjectId);
-                    
-                    alert('文件创建成功！');
-                } else {
-                    alert('创建文件失败：' + result.error);
+                // 显示编辑器
+                editorMode = true;
+                currentFileId = result.id;
+                domElements.welcomeMessage.style.display = 'none';
+                domElements.editorContainer.style.display = 'flex';
+                domElements.editorFileName.textContent = filename;
+                domElements.editorFileIcon.textContent = getFileIcon(filename);
+                
+                // 清空编辑器
+                if (editor) {
+                    editor.setValue('');
+                    const ext = filename.split('.').pop().toLowerCase();
+                    const langMap = {
+                        'py': 'python', 'js': 'javascript', 'html': 'html', 'css': 'css',
+                        'json': 'json', 'md': 'markdown', 'java': 'java', 'cpp': 'cpp'
+                    };
+                    monaco.editor.setModelLanguage(editor.getModel(), langMap[ext] || 'plaintext');
                 }
+                
+                // 刷新文件列表
+                selectProject(currentProjectId);
+                
+                showToast('文件创建成功！', 'success');
             } catch (error) {
                 console.error('创建文件失败:', error);
-                alert('创建文件失败：' + error.message);
+                showToast('创建文件失败：' + error.message, 'error');
             }
+        }
+
+        /**
+         * 检查编辑器是否有未保存的改动
+         * @returns {boolean} - 是否有未保存改动
+         */
+        function isEditorDirty() {
+            if (!currentFileData || !editor) return false;
+            return editor.getValue() !== currentFileData.content;
         }
 
         /**
@@ -1442,33 +1606,29 @@
 
             try {
                 const content = editor.getValue();
-                const response = await fetch('/api/files', {
+                const result = await fetchJsonChecked('/api/files', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         project_id: currentProjectId,
+                        file_id: currentFileId,
                         filename: document.getElementById('editorFileName').textContent,
-                        file_path: '',
+                        file_path: currentFileData ? currentFileData.file_path : '',
+                        relative_path: currentFileData ? currentFileData.relative_path : '',
                         content: content,
-                        file_type: ''
+                        file_type: currentFileData ? currentFileData.file_type : ''
                     })
                 });
 
-                const result = await response.json();
-                if (response.ok) {
-                    if (!currentFileData) currentFileData = {};
-                    currentFileData.file_path = result.file_path;
-                    currentFileData.filename = document.getElementById('editorFileName').textContent;
-                    currentFileData.content = content;
-                    // 只在主动保存时显示 toast
-                    if (!silent) {
-                        showToast('✅ 保存成功！', 'success');
-                    }
-                    return true;
-                } else {
-                    showToast('保存失败：' + result.error, 'error');
-                    return false;
+                if (!currentFileData) currentFileData = {};
+                currentFileData.file_path = result.file_path;
+                currentFileData.filename = document.getElementById('editorFileName').textContent;
+                currentFileData.content = content;
+                currentFileData.relative_path = result.relative_path;
+                if (!silent) {
+                    showToast('✅ 保存成功！', 'success');
                 }
+                return true;
             } catch (error) {
                 console.error('保存失败:', error);
                 showToast('保存失败：' + error.message, 'error');
@@ -1664,10 +1824,16 @@
                                     aiderTask.contentEl.innerHTML = marked.parse(cleaned || '...');
                                 }
                                 
-                                // 强制刷新文件树
+                                // 强制刷新文件树和编辑器内容（Aider 完成后实时刷新）
                                 if (currentProjectId) {
-                                    console.log('[DEBUG] Aider 完成，刷新文件树');
-                                    selectProject(currentProjectId);
+                                    console.log('[DEBUG] Aider 完成，刷新文件树和编辑器');
+                                    selectProject(currentProjectId).then(() => {
+                                        // 文件树刷新完成后，刷新当前编辑器内容
+                                        refreshCurrentEditorFile();
+                                    });
+                                } else {
+                                    // 即使没有项目，也尝试刷新编辑器
+                                    refreshCurrentEditorFile();
                                 }
                                 
                                 // 清理 Aider 聊天映射
@@ -1738,17 +1904,11 @@
 
         async function sendInput(userInput, executionId) {
             try {
-                const response = await fetch('/api/input', {
+                await fetchJsonChecked('/api/input', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ execution_id: executionId, input: userInput })
                 });
-
-                const result = await response.json();
-
-                if (!response.ok) {
-                    addTerminalLog(`❌ 发送输入失败：${result.error}`, 'error');
-                }
             } catch (err) {
                 addTerminalLog(`❌ 发送输入失败：${err.message}`, 'error');
             }
@@ -1761,34 +1921,28 @@
             }
 
             try {
-                const response = await fetch('/api/stop', {
+                const result = await fetchJsonChecked('/api/stop', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ execution_id: executionId })
                 });
 
-                const result = await response.json();
-
-                if (response.ok) {
-                    if (result.output) {
-                        addTerminalLog(result.output, 'info');
-                    } else {
-                        addTerminalLog('⏹️ 代码已停止', 'info');
-                    }
-                    if (runBtn) {
-                        runBtn.classList.remove('running');
-                        runBtn.innerHTML = '▶ 运行';
-                    }
-                    // 清理任务和文件映射
-                    const meta = taskMeta[executionId];
-                    if (meta && meta.filePath) {
-                        delete runningByFile[meta.filePath];
-                    }
-                    delete taskMeta[executionId];
-                    delete runningTasks[executionId];
+                if (result.output) {
+                    addTerminalLog(result.output, 'info');
                 } else {
-                    addTerminalLog(`❌ 停止失败：${result.error}`, 'error');
+                    addTerminalLog('⏹️ 代码已停止', 'info');
                 }
+                if (runBtn) {
+                    runBtn.classList.remove('running');
+                    runBtn.innerHTML = '▶ 运行';
+                }
+                // 清理任务和文件映射
+                const meta = taskMeta[executionId];
+                if (meta && meta.filePath) {
+                    delete runningByFile[meta.filePath];
+                }
+                delete taskMeta[executionId];
+                delete runningTasks[executionId];
             } catch (err) {
                 addTerminalLog(`❌ 停止失败：${err.message}`, 'error');
             }
@@ -2030,7 +2184,7 @@
 
             try {
                 const content = editor.getValue();
-                const response = await fetch('/api/files', {
+                const result = await fetchJsonChecked('/api/files', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2042,15 +2196,10 @@
                     })
                 });
 
-                const result = await response.json();
-                if (response.ok) {
-                    alert('保存成功！');
-                    currentFileId = result.id;
-                    domElements.editorFileName.textContent = filename;
-                    selectProject(currentProjectId);
-                } else {
-                    alert('保存失败：' + result.error);
-                }
+                alert('保存成功！');
+                currentFileId = result.id;
+                domElements.editorFileName.textContent = filename;
+                selectProject(currentProjectId);
             } catch (error) {
                 console.error('保存失败:', error);
                 alert('保存失败：' + error.message);
@@ -2081,19 +2230,14 @@
          */
         async function createProject(name, rootPath) {
             try {
-                const response = await fetch('/api/projects', {
+                await fetchJsonChecked('/api/projects', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, root_path: rootPath })
                 });
 
-                const result = await response.json();
-                if (response.ok) {
-                    alert('项目创建成功！');
-                    loadProjects();
-                } else {
-                    alert('创建失败：' + result.error);
-                }
+                alert('项目创建成功！');
+                loadProjects();
             } catch (error) {
                 console.error('创建项目失败:', error);
                 alert('创建失败：' + error.message);
@@ -2248,7 +2392,7 @@
                     'html': 'html', 'css': 'css'
                 };
 
-                const response = await fetch('/api/files', {
+                await fetchJsonChecked('/api/files', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2261,13 +2405,8 @@
                     })
                 });
 
-                const result = await response.json();
-                if (response.ok) {
-                    alert(`代码已保存到：${filePath}`);
-                    selectProject(projectId);
-                } else {
-                    alert('保存失败：' + result.error);
-                }
+                alert(`代码已保存到：${filePath}`);
+                selectProject(projectId);
             } catch (error) {
                 console.error('保存失败:', error);
                 alert('保存失败：' + error.message);
@@ -2397,7 +2536,7 @@
 
             // 调用 /api/run 启动 Aider
             try {
-                const response = await fetch('/api/run', {
+                const result = await fetchJsonChecked('/api/run', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2410,12 +2549,6 @@
                         use_selected_context: !!aiderSelectedFileId
                     })
                 });
-
-                const result = await safeJson(response);
-
-                if (!response.ok) {
-                    throw new Error(result.error || '启动 Aider 失败');
-                }
 
                 // 记录 Aider 聊天任务映射
                 aiderChatMap[result.execution_id] = {
@@ -2495,15 +2628,12 @@
             if (e.key === 'Enter') send();
         });
 
-        // 初始化聊天模式
-        domElements.chatModeSelect.value = chatMode;
-        updateInputPlaceholder();
+        // 初始化聊天模式（统一入口，强制设为 ai 模式）
+        applyChatMode('ai', false);
         
         // 监听聊天模式变化
         domElements.chatModeSelect.addEventListener('change', () => {
-            chatMode = domElements.chatModeSelect.value;
-            localStorage.setItem('chat_mode', chatMode);
-            updateInputPlaceholder();
+            applyChatMode(domElements.chatModeSelect.value, false);
         });
 
         // 更新输入框 placeholder

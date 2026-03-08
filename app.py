@@ -445,6 +445,7 @@ def save_file():
     """保存文件（新建或更新）"""
     data = request.json
     project_id = data.get('project_id')
+    file_id = data.get('file_id')
     filename = data.get('filename')
     file_path = data.get('file_path')
     content = data.get('content', '')
@@ -460,35 +461,48 @@ def save_file():
     # 验证参数类型
     try:
         project_id = int(project_id)
+        if file_id:
+            file_id = int(file_id)
     except ValueError:
-        return jsonify({'error': '参数类型错误：project_id 必须是整数'}), 400
-    
-    # 如果没有提供文件路径，自动生成
-    if not file_path:
-        conn = get_db_connection()
-        try:
-            cursor = conn.cursor()
-            cursor.execute('SELECT root_path FROM projects WHERE id = ?', (project_id,))
-            project = cursor.fetchone()
-            
-            if not project:
-                return jsonify({'error': '项目不存在'}), 404
-            
-            root_path = project['root_path']
-            file_path = os.path.join(root_path, filename)
-            
-            if not relative_path:
-                relative_path = filename
-        finally:
-            conn.close()
+        return jsonify({'error': '参数类型错误：project_id/file_id 必须是整数'}), 400
     
     conn = get_db_connection()
     try:
         # 验证项目是否存在
         cursor = conn.cursor()
-        cursor.execute('SELECT id FROM projects WHERE id = ?', (project_id,))
-        if not cursor.fetchone():
+        cursor.execute('SELECT id, root_path FROM projects WHERE id = ?', (project_id,))
+        project = cursor.fetchone()
+        
+        if not project:
             return jsonify({'error': '项目不存在'}), 404
+        
+        root_path = project['root_path']
+        
+        # 如果提供了 file_id，按 file_id 更新
+        if file_id:
+            cursor.execute(
+                'SELECT id, file_path, relative_path, filename FROM files WHERE id = ? AND project_id = ?',
+                (file_id, project_id)
+            )
+            existing_file = cursor.fetchone()
+            
+            if not existing_file:
+                return jsonify({'error': '文件不存在'}), 404
+            
+            # 使用数据库中的路径
+            file_path = existing_file['file_path']
+            if not relative_path:
+                relative_path = existing_file['relative_path']
+            if not filename:
+                filename = existing_file['filename']
+        else:
+            # 新建文件：如果没有提供文件路径，自动生成
+            if not file_path:
+                if relative_path:
+                    file_path = os.path.join(root_path, relative_path)
+                else:
+                    file_path = os.path.join(root_path, filename)
+                    relative_path = filename
         
         # 确保目录存在
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -500,41 +514,57 @@ def save_file():
         # 计算文件大小
         file_size = len(content.encode('utf-8'))
         
+        # 规范化路径
+        abs_path = os.path.abspath(file_path)
+        filename = os.path.basename(abs_path)
+        relative_path = os.path.relpath(abs_path, root_path)
+        
         cursor = conn.cursor()
         
-        # 检查文件是否已存在
-        cursor.execute(
-            'SELECT id FROM files WHERE file_path = ?',
-            (file_path,)
-        )
-        existing_file = cursor.fetchone()
-        
-        if existing_file:
-            # 更新现有文件
+        if file_id:
+            # 更新现有文件（按 file_id）
             cursor.execute(
                 '''UPDATE files 
-                   SET filename = ?, relative_path = ?, file_type = ?, file_size = ? 
-                   WHERE file_path = ?''',
-                (filename, relative_path, file_type, file_size, file_path)
+                   SET filename = ?, file_path = ?, relative_path = ?, file_type = ?, file_size = ? 
+                   WHERE id = ?''',
+                (filename, abs_path, relative_path, file_type, file_size, file_id)
             )
-            file_id = existing_file['id']
             message = '文件更新成功'
         else:
-            # 创建新文件记录
+            # 检查文件是否已存在（按 file_path）
             cursor.execute(
-                '''INSERT INTO files (project_id, filename, file_path, relative_path, file_type, file_size)
-                   VALUES (?, ?, ?, ?, ?, ?)''',
-                (project_id, filename, file_path, relative_path, file_type, file_size)
+                'SELECT id FROM files WHERE file_path = ?',
+                (abs_path,)
             )
-            conn.commit()
-            file_id = cursor.lastrowid
-            message = '文件保存成功'
+            existing_file = cursor.fetchone()
+            
+            if existing_file:
+                # 更新现有文件
+                cursor.execute(
+                    '''UPDATE files 
+                       SET filename = ?, relative_path = ?, file_type = ?, file_size = ? 
+                       WHERE file_path = ?''',
+                    (filename, relative_path, file_type, file_size, abs_path)
+                )
+                file_id = existing_file['id']
+                message = '文件更新成功'
+            else:
+                # 创建新文件记录
+                cursor.execute(
+                    '''INSERT INTO files (project_id, filename, file_path, relative_path, file_type, file_size)
+                       VALUES (?, ?, ?, ?, ?, ?)''',
+                    (project_id, filename, abs_path, relative_path, file_type, file_size)
+                )
+                conn.commit()
+                file_id = cursor.lastrowid
+                message = '文件保存成功'
         
         conn.commit()
         return jsonify({
             'id': file_id,
             'message': message,
-            'file_path': file_path
+            'file_path': abs_path,
+            'relative_path': relative_path
         })
     except Exception as e:
         conn.rollback()
@@ -918,11 +948,16 @@ def validate_project_paths(script_path, cwd, project_id):
     if not os_module.path.isdir(cwd):
         return jsonify({'error': f'cwd 必须是目录: {cwd}'}), 400
     
-    # 检查 script_path 是否在 cwd 内
-    script_abs = os_module.path.abspath(script_path)
-    cwd_abs = os_module.path.abspath(cwd)
+    # 规范化路径
+    script_abs = os_module.path.normpath(os_module.path.abspath(script_path))
+    cwd_abs = os_module.path.normpath(os_module.path.abspath(cwd))
     
-    if not script_abs.startswith(cwd_abs):
+    # 检查 script_path 是否在 cwd 内（使用 commonpath 防止路径绕过）
+    try:
+        common = os_module.path.commonpath([script_abs, cwd_abs])
+        if common != cwd_abs:
+            return jsonify({'error': 'script_path 必须在 cwd 目录内'}), 400
+    except ValueError:
         return jsonify({'error': 'script_path 必须在 cwd 目录内'}), 400
     
     # 如果提供了 project_id，校验 cwd 是否属于该项目
@@ -936,10 +971,14 @@ def validate_project_paths(script_path, cwd, project_id):
             if not project:
                 return jsonify({'error': f'项目不存在: project_id={project_id}'}), 400
             
-            project_root = project[0]
-            project_root_abs = os_module.path.abspath(project_root)
+            project_root = os_module.path.normpath(os_module.path.abspath(project[0]))
             
-            if not cwd_abs.startswith(project_root_abs):
+            # 检查 cwd 是否在 project_root 内（使用 commonpath 防止路径绕过）
+            try:
+                common = os_module.path.commonpath([cwd_abs, project_root])
+                if common != project_root:
+                    return jsonify({'error': 'cwd 不属于指定项目'}), 400
+            except ValueError:
                 return jsonify({'error': 'cwd 不属于指定项目'}), 400
         finally:
             conn.close()
@@ -1665,7 +1704,7 @@ def cleanup_aider_processes():
                                    capture_output=True, timeout=5)
                     else:
                         # Unix/Linux: 终止进程组
-                        os_module.killpgid(os_module.getpgid(process.pid), signal.SIGTERM)
+                        os_module.killpg(os_module.getpgid(process.pid), signal.SIGTERM)
                 except:
                     pass
 
