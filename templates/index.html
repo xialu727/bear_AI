@@ -1,0 +1,2650 @@
+﻿﻿﻿﻿﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>小熊AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .file-manager-container {
+            width: 1200px;
+            height: 850px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(139, 92, 246, 0.2);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            display: flex;
+        }
+
+        .file-sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
+            border-right: 1px solid rgba(139, 92, 246, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .new-project-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .new-project-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+
+        .project-list {
+            flex: 2;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .project-item {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .project-item:hover {
+            background: rgba(255, 255, 255, 0.9);
+            border-left-color: #8b5cf6;
+            transform: translateX(5px);
+        }
+
+        .project-item.active {
+            background: white;
+            border-left-color: #8b5cf6;
+            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
+        }
+
+        .project-info {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .project-name {
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 4px;
+        }
+
+        .project-path {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .delete-project-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #9ca3af;
+            transition: all 0.2s ease;
+            padding: 6px;
+            border-radius: 6px;
+            opacity: 0;
+        }
+
+        .project-item:hover .delete-project-btn {
+            opacity: 1;
+        }
+
+        .delete-project-btn:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            transform: scale(1.1);
+        }
+
+        .file-tree {
+            padding: 10px;
+            border-top: 1px solid rgba(139, 92, 246, 0.1);
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .file-tree-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 10px;
+            padding: 0 6px;
+        }
+
+        .file-item {
+            padding: 10px 16px;
+            margin-bottom: 6px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+        }
+
+        .file-item:hover {
+            background: rgba(139, 92, 246, 0.1);
+            color: #8b5cf6;
+        }
+
+        .file-item.active {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%);
+            color: #8b5cf6;
+            font-weight: 600;
+        }
+
+        .file-item.aider-selected {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
+            color: #10b981;
+            font-weight: 600;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .file-icon {
+            font-size: 16px;
+        }
+
+        .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .delete-file-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: #9ca3af;
+            transition: all 0.2s ease;
+            padding: 4px;
+            border-radius: 4px;
+            opacity: 0;
+        }
+
+        .file-item:hover .delete-file-btn {
+            opacity: 1;
+        }
+
+        .delete-file-btn:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            transform: scale(1.1);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
+        }
+
+        .ai-sidebar {
+            width: 450px;
+            background: linear-gradient(180deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
+            border-left: 1px solid rgba(139, 92, 246, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .ai-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .editor-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
+        }
+
+        .welcome-message {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(180deg, rgba(139, 92, 246, 0.02) 0%, rgba(236, 72, 153, 0.02) 100%);
+            text-align: center;
+            padding: 40px;
+        }
+
+        .welcome-message h2 {
+            font-size: 32px;
+            color: #8b5cf6;
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+
+        .welcome-message p {
+            font-size: 18px;
+            color: #6b7280;
+            margin-bottom: 24px;
+        }
+
+        .welcome-message .hint {
+            font-size: 14px;
+            color: #9ca3af;
+            padding: 12px 24px;
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .create-file-btn {
+            margin-top: 24px;
+            padding: 12px 32px;
+            font-size: 16px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .create-file-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .editor-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .editor-header {
+            padding: 16px 24px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
+            border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .editor-file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #4b5563;
+        }
+
+        .editor-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .run-editor-btn, .save-btn {
+            padding: 6px 16px;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .run-editor-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        }
+
+        .run-editor-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+        }
+
+        .run-editor-btn.running {
+            opacity: 0.7;
+        }
+
+        .save-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+
+        .save-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+        }
+
+        .save-btn.saving {
+            opacity: 0.7;
+        }
+
+        #editor {
+            flex: 1;
+            min-height: 200px;
+            overflow: hidden;
+        }
+
+        .terminal-panel {
+            height: 250px;
+            background: #fff;
+            border-top: 1px solid rgba(139, 92, 246, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            padding: 10px 16px;
+            background: #fff;
+            color: #4b5563;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+        }
+
+        .terminal-clear-btn {
+            background: rgba(139, 92, 246, 0.1);
+            border: none;
+            color: #4b5563;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .terminal-clear-btn:hover {
+            background: rgba(139, 92, 246, 0.2);
+        }
+
+        .terminal-output {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            background: #fff;
+            color: #4b5563;
+        }
+
+        .terminal-output .log {
+            margin: 4px 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #111827;
+        }
+
+        .service-btn {
+            padding: 6px 16px;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .terminal-output .log.error {
+            color: #dc2626;
+        }
+
+        .terminal-output .log.success {
+            color: #111827;
+        }
+
+        .terminal-output .log.info {
+            color: #111827;
+        }
+
+        .user-msg, .ai-msg {
+            margin: 16px 0;
+            font-weight: 500;
+            font-size: 13px;
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        .user-msg {
+            text-align: right;
+        }
+
+        .user-msg::before { content: "你: "; color: #8b5cf6; font-weight: bold; }
+
+        .ai-msg {
+            color: #333;
+            position: relative;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%);
+            padding: 20px;
+            border-radius: 16px;
+            border-left: 4px solid #8b5cf6;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
+            animation: slideInLeft 0.3s ease-out;
+        }
+
+        .ai-msg::before { content: "AI助手: "; color: #8b5cf6; font-weight: bold; }
+
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .msg-actions {
+            display: flex;
+            justify-content: flex-start;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #aaa;
+            transition: all 0.3s ease;
+            padding: 6px 10px;
+            border-radius: 8px;
+        }
+
+        .action-btn:hover {
+            color: #8b5cf6;
+            background: rgba(139, 92, 246, 0.1);
+            transform: scale(1.1);
+        }
+
+        .input-area {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.98);
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 聊天模式选择器包装器 */
+        .chat-mode-wrapper {
+            position: relative;
+            width: 44px;
+            height: 44px;
+        }
+
+        /* 聊天模式图标（显示层） */
+        .chat-mode-icon {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 聊天模式选择器（透明点击层） */
+        .chat-mode-select {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            border: 2px solid rgba(139, 92, 246, 0.2);
+            border-radius: 10px;
+            background: transparent;
+            color: transparent;
+            font-size: 22px;
+            line-height: 1;
+            text-align: center;
+            text-align-last: center;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            z-index: 2;
+            opacity: 0;
+        }
+
+        .chat-mode-select:hover {
+            border-color: rgba(139, 92, 246, 0.4);
+        }
+
+        .chat-mode-select:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .chat-mode-select option {
+            color: #111;
+            font-size: 14px;
+            background: #fff;
+        }
+
+        #input {
+            flex: 1;
+            padding: 16px 24px;
+            border: 2px solid rgba(139, 92, 246, 0.2);
+            border-radius: 30px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        #input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1), inset 0 2px 8px rgba(0, 0, 0, 0.05);
+            transform: translateY(-1px);
+        }
+
+        .btn-group { display: flex; gap: 12px; align-items: center; }
+
+        #send, #stop, #regenerate {
+            padding: 0 28px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.3);
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #stop, #regenerate {
+            padding: 0 16px;
+            font-size: 20px;
+            width: 52px;
+        }
+
+        #send:hover, #stop:hover, #regenerate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+        }
+
+        #stop {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        #stop:hover { box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4); }
+
+        .ai-msg-content { line-height: 1.7; color: #4b5563; }
+
+        pre {
+            position: relative !important;
+            background: linear-gradient(135deg, #2d2d2d 0%, #3d3d3d 100%);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 16px 0;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        .code-run-btn, .save-code-btn, .copy-code-btn {
+            position: absolute;
+            top: 12px;
+            right: 0;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 0;
+            cursor: pointer;
+            font-size: 11px;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            width: 50px;
+            text-align: center;
+        }
+
+        .copy-code-btn {
+            right: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            opacity: 0.7;
+        }
+        .copy-code-btn:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        .copy-code-btn.copied {
+            background: rgba(34, 197, 94, 0.8);
+        }
+
+        .save-code-btn {
+            right: calc(8px + 50px + 8px);
+            background: rgba(139, 92, 246, 0.8);
+            color: #fff;
+            opacity: 0.9;
+        }
+        .save-code-btn:hover {
+            background: rgba(139, 92, 246, 1);
+            transform: translateY(-1px);
+        }
+
+        .code-run-btn {
+            right: calc(8px + 50px + 8px + 50px + 8px);
+            background: rgba(34, 197, 94, 0.8);
+            color: #fff;
+        }
+        .code-run-btn:hover {
+            opacity: 1;
+            background: rgba(34, 197, 94, 1);
+            transform: translateY(-1px);
+        }
+        .code-run-btn.running {
+            background: rgba(251, 191, 36, 0.8);
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+            z-index: 10000;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%);
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .ai-msg-content code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: rgba(139, 92, 246, 0.1);
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            color: #8b5cf6;
+        }
+
+        .ai-msg-content pre code {
+            background: transparent;
+            padding: 0;
+            border: none;
+            color: #e5e7eb;
+        }
+
+        .ai-msg-content h1, .ai-msg-content h2, .ai-msg-content h3 {
+            margin: 24px 0 16px 0;
+            color: #8b5cf6;
+            font-weight: 700;
+        }
+
+        .chat-box::-webkit-scrollbar { width: 8px; }
+        .chat-box::-webkit-scrollbar-track { background: rgba(139, 92, 246, 0.1); border-radius: 4px; }
+        .chat-box::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #8b5cf6 0%, #ec4899 100%); border-radius: 4px; }
+
+        @media (max-width: 768px) {
+            .code-run-btn, .save-code-btn, .copy-code-btn {
+                padding: 4px 0;
+                font-size: 10px;
+                width: 40px;
+            }
+            .copy-code-btn { right: 6px; }
+            .save-code-btn { right: calc(6px + 40px + 6px); }
+            .code-run-btn { right: calc(6px + 40px + 6px + 40px + 6px); }
+            
+            .chat-mode-wrapper {
+                width: 44px;
+                height: 44px;
+            }
+
+            .chat-mode-icon {
+                width: 44px;
+                height: 44px;
+                font-size: 22px;
+            }
+
+            .chat-mode-select {
+                width: 44px;
+                height: 44px;
+            }
+            
+            .input-area {
+                flex-wrap: wrap;
+            }
+            
+            #input {
+                order: 2;
+                flex-basis: 100%;
+                margin-top: 8px;
+            }
+            
+            #chatModeSelect {
+                order: 1;
+            }
+            
+            .btn-group {
+                order: 3;
+            }
+        }
+    </style>
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdn.bootcdn.net/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+</head>
+<body>
+    <div id="toast" class="toast"></div>
+    <div class="file-manager-container">
+        <div class="file-sidebar">
+            <div class="sidebar-header">
+                <span>📁 项目列表</span>
+                <div style="display: flex; gap: 8px;">
+                    <button class="new-project-btn" onclick="createNewFile()" title="新建文件">📄</button>
+                    <button class="new-project-btn" onclick="showNewProjectModal()" title="新建项目">+</button>
+                </div>
+            </div>
+            <div class="project-list" id="projectList"></div>
+            <div class="file-tree" id="fileTree" style="display: none;">
+                <div class="file-tree-title">📄 文件列表</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="welcome-message" id="welcomeMessage">
+                <h2>🐻 小熊 AI</h2>
+                <p>欢迎使用小熊AI代码编辑器</p>
+                <div class="hint">请选择文件以开始编辑，或在左侧点击📄按钮创建新文件</div>
+            </div>
+            <div class="editor-container" id="editorContainer" style="display: none;">
+                <div class="editor-header">
+                    <div class="editor-file-info">
+                        <span id="editorFileIcon">📄</span>
+                        <span id="editorFileName">未选择文件</span>
+                    </div>
+                    <div class="editor-actions">
+                        <button class="run-editor-btn" onclick="runEditorCode()">▶ 运行</button>
+                        <button class="save-btn" onclick="saveCurrentFile()">💾 保存</button>
+                        <button class="save-btn" onclick="saveAsNewFile()" style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);">💾 另存为</button>
+                    </div>
+                </div>
+                <div class="editor-wrapper">
+                    <div id="editor"></div>
+                    <div class="terminal-panel" id="terminalPanel">
+                        <div class="terminal-header">
+                            <span>💻 终端</span>
+                            <button class="terminal-clear-btn" onclick="clearTerminal()">清空</button>
+                        </div>
+                        <div class="terminal-output" id="terminalOutput"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ai-sidebar">
+            <div class="ai-header">
+                <span>🐻 小熊 AI</span>
+            </div>
+            <div class="chat-box" id="chatBox"></div>
+            <div class="input-area">
+                <div class="chat-mode-wrapper">
+                    <span id="chatModeIcon" class="chat-mode-icon">🐻</span>
+                    <select id="chatModeSelect" class="chat-mode-select">
+                        <option value="ai">🐻</option>
+                        <option value="aider">🤖</option>
+                    </select>
+                </div>
+                <input id="input" placeholder="请输入...">
+                <div class="btn-group">
+                    <button id="send" onclick="send()">发送</button>
+                    <button id="stop" onclick="stopGeneration()" style="display: none;">⏹</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 统一 JSON 安全解析函数
+        async function safeJson(response) {
+            try {
+                const text = await response.text();
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    return { error: text };
+                }
+            } catch (e) {
+                return { error: e.message };
+            }
+        }
+
+        // Aider 输出过滤函数
+        function cleanAiderOutput(raw, prompt = '') {
+            if (!raw) return '';
+
+            let lines = raw.replace(/\r/g, '').split('\n');
+            let cleanedLines = [];
+
+            for (let line of lines) {
+                let trimmed = line.trim();
+                
+                // 先去掉开头的 > 符号
+                if (trimmed.startsWith('> ')) {
+                    trimmed = trimmed.substring(2).trim();
+                } else if (trimmed.startsWith('>')) {
+                    trimmed = trimmed.substring(1).trim();
+                }
+
+                // 检查是否是噪音行
+                const noisePatterns = [
+                    'Aider v',
+                    'Model:',
+                    'Git repo:',
+                    'Repo-map:',
+                    'Added ',
+                    'Note: in-chat filenames',
+                    'Cur working dir:',
+                    'Git working dir:',
+                    'Tokens:',
+                    '✅ Aider 完成，已同步',
+                    'https://aider.chat/docs/',
+                    'Open documentation url'
+                ];
+
+                let isNoise = false;
+                for (let pattern of noisePatterns) {
+                    if (trimmed.includes(pattern)) {
+                        isNoise = true;
+                        break;
+                    }
+                }
+
+                if (!isNoise) {
+                    // 去掉开头的 > 符号后保留
+                    let cleanLine = line;
+                    if (cleanLine.trim().startsWith('> ')) {
+                        cleanLine = cleanLine.replace(/^\s*> /, '');
+                    } else if (cleanLine.trim().startsWith('>')) {
+                        cleanLine = cleanLine.replace(/^\s*>/, '');
+                    }
+                    cleanedLines.push(cleanLine);
+                }
+            }
+
+            let text = cleanedLines.join('\n');
+
+            // 去掉 Aider 回显的"#### 用户问题"
+            if (prompt && prompt.trim()) {
+                const esc = prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                text = text.replace(new RegExp(`^\\s*####\\s*${esc}\\s*\\n+`, 'm'), '');
+                // 也处理带 > 的情况
+                text = text.replace(new RegExp(`^\\s*>\\s*####\\s*${esc}\\s*\\n+`, 'm'), '');
+            }
+
+            // 清理多余的空行
+            return text.replace(/\n{3,}/g, '\n\n').trim();
+        }
+
+        // 配置marked和highlight.js
+        marked.setOptions({
+            highlight: (code, lang) => {
+                const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                return hljs.highlight(code, { language }).value;
+            },
+            langPrefix: 'hljs language-'
+        });
+
+        // Socket.IO连接
+        const socket = io(window.location.origin, {
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000
+        });
+        const chatBox = document.getElementById('chatBox');
+        const input = document.getElementById('input');
+        const sendBtn = document.getElementById('send');
+        const stopBtn = document.getElementById('stop');
+
+        // 全局变量
+        let lastQuestion = null, isGenerating = false, fullResponse = "";
+        let projects = [], currentProjectId = null, currentFileId = null, currentFileData = null;
+        let editor = null, editorMode = false;
+        
+        // 获取客户端 ID（本地持久）
+        function getClientId() {
+            let id = localStorage.getItem('webide_client_id');
+            if (!id) {
+                id = crypto.randomUUID ? crypto.randomUUID() : 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('webide_client_id', id);
+            }
+            return id;
+        }
+        
+        // Aider 上下文请求函数
+        async function selectAiderContext(fileId) {
+            if (!currentProjectId) return;
+            try {
+                const response = await fetch('/api/aider/context/select', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        project_id: currentProjectId,
+                        file_id: fileId
+                    })
+                });
+                const result = await safeJson(response);
+                if (result.ok) {
+                    aiderSelectedFileId = fileId;
+                    console.log('[DEBUG] Aider 上下文已选择:', result.selected);
+                } else {
+                    console.error('[DEBUG] 选择 Aider 上下文失败:', result.error);
+                }
+            } catch (error) {
+                console.error('[DEBUG] 选择 Aider 上下文异常:', error);
+            }
+        }
+        
+        async function fetchAiderContext() {
+            if (!currentProjectId) return null;
+            try {
+                const response = await fetch(`/api/aider/context?client_id=${clientId}&project_id=${currentProjectId}`);
+                const result = await safeJson(response);
+                if (result.ok && result.selected) {
+                    aiderSelectedFileId = result.selected.file_id;
+                    console.log('[DEBUG] Aider 上下文已加载:', result.selected);
+                    return result.selected;
+                } else {
+                    aiderSelectedFileId = null;
+                    return null;
+                }
+            } catch (error) {
+                console.error('[DEBUG] 获取 Aider 上下文异常:', error);
+                aiderSelectedFileId = null;
+                return null;
+            }
+        }
+        
+        async function clearAiderContext() {
+            if (!currentProjectId) return;
+            try {
+                const response = await fetch('/api/aider/context/clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        project_id: currentProjectId
+                    })
+                });
+                const result = await safeJson(response);
+                if (result.ok) {
+                    aiderSelectedFileId = null;
+                    console.log('[DEBUG] Aider 上下文已清空');
+                }
+            } catch (error) {
+                console.error('[DEBUG] 清空 Aider 上下文异常:', error);
+            }
+        }
+        
+        // 任务管理：按任务实例管理执行状态
+        const runningTasks = {};
+        
+        // Aider 聊天任务映射
+        const aiderChatMap = {};
+        
+        // 按文件管理的运行状态
+        const runningByFile = {};  // filePath -> executionId
+        const taskMeta = {};        // executionId -> { filePath, runBtn, runMode, source }
+        
+        // Aider 上下文管理
+        const clientId = getClientId();
+        let aiderSelectedFileId = null;  // 当前项目下选中的文件 id
+        
+        // 聊天模式管理常量
+        const CHAT_MODE_KEY = 'chat_mode';
+        const DEFAULT_CHAT_MODE = 'ai';
+        const ALLOWED_CHAT_MODES = new Set(['ai', 'aider']);
+        
+        // 全局聊天模式变量
+        let chatMode = DEFAULT_CHAT_MODE;
+        
+        /**
+         * 渲染聊天模式图标
+         * @param {string} mode - 聊天模式
+         */
+        function renderChatModeIcon(mode) {
+            const iconEl = document.getElementById('chatModeIcon');
+            if (!iconEl) return;
+            
+            if (mode === 'ai') {
+                iconEl.textContent = '🐻';
+            } else if (mode === 'aider') {
+                iconEl.textContent = '🤖';
+            } else {
+                iconEl.textContent = '🐻';
+            }
+        }
+        
+        /**
+         * 应用聊天模式（统一入口）
+         * @param {string} mode - 要应用的模式
+         * @param {boolean} persist - 是否持久化到 localStorage（已废弃，始终 false）
+         */
+        function applyChatMode(mode, persist = false) {
+            // 归一化 mode（仅允许 ai/aider）
+            const normalizedMode = ALLOWED_CHAT_MODES.has(mode) ? mode : DEFAULT_CHAT_MODE;
+            
+            // 赋值给全局变量
+            chatMode = normalizedMode;
+            
+            // 同步下拉框值
+            if (domElements.chatModeSelect) {
+                domElements.chatModeSelect.value = normalizedMode;
+            }
+            
+            // 渲染图标
+            renderChatModeIcon(normalizedMode);
+            
+            // 更新 placeholder
+            updateInputPlaceholder();
+        }
+        
+        // 服务管理
+        const runningServices = {};
+        const serviceLogOffsets = {};
+
+        // DOM元素缓存
+        const domElements = {
+            projectList: document.getElementById('projectList'),
+            fileTree: document.getElementById('fileTree'),
+            welcomeMessage: document.getElementById('welcomeMessage'),
+            editorContainer: document.getElementById('editorContainer'),
+            editorFileName: document.getElementById('editorFileName'),
+            editorFileIcon: document.getElementById('editorFileIcon'),
+            terminalOutput: document.getElementById('terminalOutput'),
+            chatModeSelect: document.getElementById('chatModeSelect'),
+            input: document.getElementById('input')
+        };
+
+        // 页面启动时清除旧的 chat_mode 数据
+        try {
+            localStorage.removeItem('chat_mode');
+        } catch (e) {
+            console.warn('清除旧 chat_mode 数据失败:', e);
+        }
+
+        // 初始化Monaco编辑器
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
+        require(['vs/editor/editor.main'], function() {
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                theme: 'vs',
+                automaticLayout: true,
+                fontSize: 14,
+                minimap: { enabled: true },
+                scrollBeyondLastLine: false,
+                wordWrap: 'on'
+            });
+        });
+
+        /**
+         * 安全解析 JSON（防止 response.json() 崩溃）
+         * @param {Response} response - Fetch 响应对象
+         * @returns {Promise<Object>} - 解析后的 JSON 对象，失败返回 null
+         */
+        async function safeJson(response) {
+            try {
+                const text = await response.text();
+                if (!text || !text.trim()) {
+                    return null;
+                }
+                return JSON.parse(text);
+            } catch (error) {
+                console.error('JSON 解析失败:', error);
+                return null;
+            }
+        }
+
+        /**
+         * 获取并检查 JSON 响应（统一错误处理）
+         * @param {string} url - 请求 URL
+         * @param {Object} options - Fetch 选项
+         * @returns {Promise<Object>} - 解析后的 JSON 对象
+         * @throws {Error} - 当响应不成功或 JSON 解析失败时抛出错误
+         */
+        async function fetchJsonChecked(url, options = {}) {
+            const response = await fetch(url, options);
+            const data = await safeJson(response);
+            
+            if (!response.ok) {
+                const errorMsg = data && data.error ? data.error : `请求失败: ${response.status}`;
+                throw new Error(errorMsg);
+            }
+            
+            if (!data) {
+                throw new Error('响应数据无效');
+            }
+            
+            return data;
+        }
+
+        /**
+         * 加载项目列表
+         */
+        async function loadProjects() {
+            try {
+                projects = await fetchJsonChecked('/api/projects');
+                renderProjectList();
+            } catch (error) {
+                console.error('加载项目失败:', error);
+                showToast('加载项目失败：' + error.message, 'error');
+            }
+        }
+
+        /**
+         * 渲染项目列表
+         */
+        function renderProjectList() {
+            domElements.projectList.innerHTML = '';
+
+            if (projects.length === 0) {
+                domElements.projectList.innerHTML = '<div style="padding: 20px; text-align: center; color: #9ca3af;">暂无项目<br>点击右上角 + 创建</div>';
+                return;
+            }
+
+            projects.forEach(project => {
+                const projectEl = document.createElement('div');
+                projectEl.className = 'project-item' + (project.id === currentProjectId ? ' active' : '');
+                projectEl.innerHTML = `
+                    <div class="project-info">
+                        <div class="project-name">📁 ${project.name}</div>
+                        <div class="project-path">${project.root_path}</div>
+                    </div>
+                    <button class="delete-project-btn" onclick="event.stopPropagation(); deleteProject(${project.id}, '${project.name}')" title="删除项目">🗑️</button>
+                `;
+                projectEl.onclick = () => selectProject(project.id);
+                domElements.projectList.appendChild(projectEl);
+            });
+        }
+
+        /**
+         * 选择项目
+         * @param {number} projectId - 项目ID
+         */
+        async function selectProject(projectId) {
+            currentProjectId = projectId;
+            renderProjectList();
+
+            try {
+                const files = await fetchJsonChecked(`/api/projects/${projectId}/files`);
+                
+                // 先加载 Aider 上下文
+                await fetchAiderContext();
+                
+                // 再渲染文件树（带高亮）
+                renderFileTree(files);
+            } catch (error) {
+                console.error('加载文件失败:', error);
+                showToast('加载文件失败：' + error.message, 'error');
+            }
+        }
+
+        /**
+         * 删除项目
+         * @param {number} projectId - 项目ID
+         * @param {string} projectName - 项目名称
+         */
+        async function deleteProject(projectId, projectName) {
+            if (!confirm(`确定要删除项目 "${projectName}" 吗？\n\n⚠️ 警告：此操作将删除该项目及其所有文件记录，且不可恢复！`)) {
+                return;
+            }
+
+            try {
+                await fetchJsonChecked(`/api/projects/${projectId}`, {
+                    method: 'DELETE'
+                });
+
+                alert('项目删除成功！');
+                // 如果删除的是当前选中的项目，清空当前项目
+                if (currentProjectId === projectId) {
+                    currentProjectId = null;
+                    currentFileId = null;
+                    document.getElementById('fileTree').style.display = 'none';
+                }
+                // 刷新项目列表
+                loadProjects();
+            } catch (error) {
+                console.error('删除项目失败:', error);
+                alert('删除失败：' + error.message);
+            }
+        }
+
+        /**
+         * 渲染文件树
+         * @param {Array} files - 文件列表
+         */
+        function renderFileTree(files) {
+            domElements.fileTree.style.display = files.length > 0 ? 'block' : 'none';
+            domElements.fileTree.querySelector('.file-tree-title').textContent = `📄 文件列表 (${files.length})`;
+
+            domElements.fileTree.querySelectorAll('.file-item').forEach(el => el.remove());
+
+            files.forEach(file => {
+                const fileEl = document.createElement('div');
+                fileEl.className = 'file-item';
+                if (file.id === aiderSelectedFileId) {
+                    fileEl.className += ' aider-selected';
+                }
+                const icon = getFileIcon(file.file_type || file.filename);
+                fileEl.innerHTML = `
+                    <span class="file-icon">${icon}</span>
+                    <span class="file-name">${file.filename}</span>
+                    <button class="delete-file-btn" onclick="event.stopPropagation(); deleteFile(${file.id}, '${file.filename}')" title="删除文件">🗑️</button>
+                `;
+                fileEl.onclick = () => openFile(file.id);
+                domElements.fileTree.appendChild(fileEl);
+            });
+        }
+
+        /**
+         * 获取文件图标
+         * @param {string} filename - 文件名
+         * @returns {string} 图标
+         */
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'py': '🐍', 'js': '🟨', 'html': '🌐', 'css': '🎨',
+                'json': '📋', 'md': '📝', 'txt': '📄', 'java': '☕',
+                'cpp': '⚡', 'c': '⚡', 'go': '🔷', 'rs': '🦀'
+            };
+            return icons[ext] || '📄';
+        }
+
+        /**
+         * 打开文件
+         * @param {number} fileId - 文件ID
+         */
+        async function openFile(fileId) {
+            try {
+                const fileData = await fetchJsonChecked(`/api/files/${fileId}`);
+
+                currentFileId = fileId;
+                showEditor(fileData);
+                
+                // 检查是否二次点击同一文件
+                if (fileId === aiderSelectedFileId) {
+                    // 二次点击：取消 Aider 上下文绑定
+                    await clearAiderContext();
+                    aiderSelectedFileId = null;
+                    
+                    // 刷新文件树高亮（取消绿色选中）
+                    if (currentProjectId) {
+                        const files = await fetchJsonChecked(`/api/projects/${currentProjectId}/files`);
+                        renderFileTree(files);
+                    }
+                    
+                    // 轻提示
+                    showToast('已取消 Aider 上下文绑定', 'info');
+                } else {
+                    // 第一次点击：添加到 Aider 上下文
+                    await selectAiderContext(fileId);
+                    aiderSelectedFileId = fileId;
+                    
+                    // 刷新文件树高亮
+                    if (currentProjectId) {
+                        const files = await fetchJsonChecked(`/api/projects/${currentProjectId}/files`);
+                        renderFileTree(files);
+                    }
+                }
+            } catch (error) {
+                console.error('打开文件失败:', error);
+                showToast('打开文件失败：' + error.message, 'error');
+            }
+        }
+
+        /**
+         * 删除文件
+         * @param {number} fileId - 文件ID
+         * @param {string} filename - 文件名
+         */
+        async function deleteFile(fileId, filename) {
+            if (!confirm(`确定要删除文件 "${filename}" 吗？此操作不可恢复！`)) {
+                return;
+            }
+
+            try {
+                await fetchJsonChecked(`/api/files/${fileId}`, {
+                    method: 'DELETE'
+                });
+
+                showToast('文件删除成功！', 'success');
+                // 刷新文件列表
+                if (currentProjectId) {
+                    selectProject(currentProjectId);
+                }
+            } catch (error) {
+                console.error('删除文件失败:', error);
+                showToast('删除失败：' + error.message, 'error');
+            }
+        }
+
+        /**
+         * 显示编辑器
+         * @param {Object} fileData - 文件数据
+         */
+        function showEditor(fileData) {
+            editorMode = true;
+            currentFileId = fileData.id;
+            currentFileData = fileData;
+
+            domElements.welcomeMessage.style.display = 'none';
+            domElements.editorContainer.style.display = 'flex';
+
+            domElements.editorFileName.textContent = fileData.filename;
+            domElements.editorFileIcon.textContent = getFileIcon(fileData.filename);
+
+            if (editor) {
+                editor.setValue(fileData.content);
+                const langMap = {
+                    'py': 'python', 'js': 'javascript', 'html': 'html', 'css': 'css',
+                    'json': 'json', 'md': 'markdown', 'java': 'java', 'cpp': 'cpp'
+                };
+                const ext = fileData.filename.split('.').pop().toLowerCase();
+                monaco.editor.setModelLanguage(editor.getModel(), langMap[ext] || 'plaintext');
+            }
+            
+            // 刷新运行按钮状态
+            refreshRunButtonState();
+        }
+
+        /**
+         * 刷新运行按钮状态（根据当前文件）
+         */
+        function refreshRunButtonState() {
+            const runBtn = document.querySelector('.run-editor-btn');
+            if (!runBtn) return;
+            
+            const filePath = currentFileData && currentFileData.file_path ? currentFileData.file_path : '';
+            const executionId = runningByFile[filePath];
+            
+            if (executionId && runningTasks[executionId]) {
+                // 当前文件正在运行
+                runBtn.classList.add('running');
+                runBtn.innerHTML = '⏹ 停止';
+            } else {
+                // 当前文件未运行
+                runBtn.classList.remove('running');
+                runBtn.innerHTML = '▶ 运行';
+            }
+        }
+
+        /**
+         * 刷新当前编辑器文件内容（无副作用，不改变 Aider 上下文）
+         * 用于 Aider 完成后自动刷新编辑器显示
+         */
+        async function refreshCurrentEditorFile() {
+            if (!currentFileId || !editor) return;
+            
+            // 检查是否有未保存的本地改动
+            if (isEditorDirty()) {
+                console.log('[DEBUG] 编辑器有未保存改动，跳过自动刷新');
+                showToast('文件有未保存改动，请手动刷新', 'info');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/files/${currentFileId}`);
+                const fileData = await safeJson(response);
+                
+                if (response.ok && fileData) {
+                    // 保存当前光标位置
+                    const position = editor.getPosition();
+                    
+                    // 更新编辑器内容
+                    editor.setValue(fileData.content);
+                    
+                    // 恢复光标位置（如果可能）
+                    if (position) {
+                        editor.setPosition(position);
+                    }
+                    
+                    // 更新当前文件数据
+                    currentFileData = fileData;
+                    
+                    console.log('[DEBUG] 编辑器内容已刷新');
+                }
+            } catch (error) {
+                console.error('刷新编辑器内容失败:', error);
+            }
+        }
+
+        /**
+         * 新建文件
+         */
+        async function createNewFile() {
+            if (!currentProjectId) {
+                alert('请先选择一个项目！');
+                return;
+            }
+
+            const filename = prompt('请输入文件名（例如：main.py）：');
+            if (!filename) return;
+
+            // 检查文件名格式
+            if (!filename.includes('.')) {
+                alert('请输入带扩展名的文件名（例如：main.py）');
+                return;
+            }
+
+            try {
+                const result = await fetchJsonChecked('/api/files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_id: currentProjectId,
+                        filename: filename,
+                        file_path: '',
+                        content: '',
+                        file_type: ''
+                    })
+                });
+
+                // 显示编辑器
+                editorMode = true;
+                currentFileId = result.id;
+                domElements.welcomeMessage.style.display = 'none';
+                domElements.editorContainer.style.display = 'flex';
+                domElements.editorFileName.textContent = filename;
+                domElements.editorFileIcon.textContent = getFileIcon(filename);
+                
+                // 清空编辑器
+                if (editor) {
+                    editor.setValue('');
+                    const ext = filename.split('.').pop().toLowerCase();
+                    const langMap = {
+                        'py': 'python', 'js': 'javascript', 'html': 'html', 'css': 'css',
+                        'json': 'json', 'md': 'markdown', 'java': 'java', 'cpp': 'cpp'
+                    };
+                    monaco.editor.setModelLanguage(editor.getModel(), langMap[ext] || 'plaintext');
+                }
+                
+                // 刷新文件列表
+                selectProject(currentProjectId);
+                
+                showToast('文件创建成功！', 'success');
+            } catch (error) {
+                console.error('创建文件失败:', error);
+                showToast('创建文件失败：' + error.message, 'error');
+            }
+        }
+
+        /**
+         * 检查编辑器是否有未保存的改动
+         * @returns {boolean} - 是否有未保存改动
+         */
+        function isEditorDirty() {
+            if (!currentFileData || !editor) return false;
+            return editor.getValue() !== currentFileData.content;
+        }
+
+        /**
+         * 保存当前文件
+         * @param {boolean} silent - 是否静默保存（不显示 toast）
+         */
+        async function saveCurrentFile(silent = false) {
+            if (!currentFileId || !editor) return false;
+
+            const saveBtn = document.querySelector('.save-btn');
+            saveBtn.classList.add('saving');
+            saveBtn.innerHTML = '⏳ 保存中...';
+
+            try {
+                const content = editor.getValue();
+                const result = await fetchJsonChecked('/api/files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_id: currentProjectId,
+                        file_id: currentFileId,
+                        filename: document.getElementById('editorFileName').textContent,
+                        file_path: currentFileData ? currentFileData.file_path : '',
+                        relative_path: currentFileData ? currentFileData.relative_path : '',
+                        content: content,
+                        file_type: currentFileData ? currentFileData.file_type : ''
+                    })
+                });
+
+                if (!currentFileData) currentFileData = {};
+                currentFileData.file_path = result.file_path;
+                currentFileData.filename = document.getElementById('editorFileName').textContent;
+                currentFileData.content = content;
+                currentFileData.relative_path = result.relative_path;
+                if (!silent) {
+                    showToast('✅ 保存成功！', 'success');
+                }
+                return true;
+            } catch (error) {
+                console.error('保存失败:', error);
+                showToast('保存失败：' + error.message, 'error');
+                return false;
+            } finally {
+                saveBtn.classList.remove('saving');
+                saveBtn.innerHTML = '💾 保存';
+            }
+        }
+
+        /**
+         * 运行代码（通用函数）
+         * @param {string} code - 代码内容
+         * @param {string} language - 语言类型
+         * @param {HTMLElement} runBtn - 运行按钮（可选）
+         * @param {string} filePath - 文件路径（可选，用于按文件管理状态）
+         */
+        async function runCode(code, language, runBtn = null, filePath = null) {
+            if (runBtn) {
+                runBtn.classList.add('running');
+                runBtn.innerHTML = '⏹ 停止';
+            }
+
+            addTerminalLog(`▶ 开始执行${language === 'python' ? 'Python' : 'JavaScript'}代码...`, 'info');
+
+            try {
+                const response = await fetch('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, language })
+                });
+
+                const result = await safeJson(response);
+
+                console.log(`[DEBUG] pollOutput result:`, result);
+                // console.log(`[DEBUG] task.runMode:`, task.runMode);
+                console.log(`[DEBUG] result.running:`, result.running);
+                console.log(`[DEBUG] result.output:`, result.output);
+
+                if (response.ok) {
+                    const executionId = result.execution_id;
+                    
+                    // 检查是否需要在浏览器中执行 JavaScript
+                    if (result.browser_exec === true && result.code) {
+                        addTerminalLog('正在浏览器中执行 JavaScript 代码...', 'info');
+                        try {
+                            // 捕获 console.log 输出
+                            const originalLog = console.log;
+                            let jsOutput = [];
+                            console.log = function(...args) {
+                                jsOutput.push(args.join(' '));
+                                originalLog.apply(console, args);
+                            };
+                            
+                            // 执行 JavaScript 代码
+                            eval(result.code);
+                            
+                            // 恢复 console.log
+                            console.log = originalLog;
+                            
+                            // 显示输出
+                            if (jsOutput.length > 0) {
+                                addTerminalLog(jsOutput.join('\n'), 'success');
+                            } else {
+                                addTerminalLog('✅ JavaScript 代码执行完成（无输出）', 'success');
+                            }
+                        } catch (err) {
+                            addTerminalLog(`❌ JavaScript 错误：${err.message}`, 'error');
+                        }
+                        
+                        // 重置按钮状态
+                        if (runBtn) {
+                            runBtn.classList.remove('running');
+                            runBtn.innerHTML = '▶ 运行';
+                        }
+                    } else if (result.output) {
+                        addTerminalLog(result.output, 'success');
+                        
+                        // 如果是Web服务，显示访问地址
+                        if (result.is_web_service === true && result.service_url) {
+                            addTerminalLog('🌐 Web服务已启动，请使用浏览器访问：' + result.service_url, 'info');
+                        }
+                    }
+                    
+                    // 开始轮询输出
+                    if (result.running === true && executionId) {
+                        // 创建任务实例
+                        runningTasks[executionId] = {
+                            runBtn: runBtn,
+                            isRunning: true,
+                            isWebService: result.is_web_service === true
+                        };
+                        
+                        // 使用传入的 filePath，如果没有则使用当前文件路径或 snippet 标识符
+                        const actualFilePath = filePath || (currentFileData && currentFileData.file_path ? currentFileData.file_path : '__snippet__');
+                        runningByFile[actualFilePath] = executionId;
+                        taskMeta[executionId] = {
+                            filePath: actualFilePath,
+                            runBtn: runBtn,
+                            runMode: 'snippet',
+                            source: runBtn && runBtn.classList.contains('code-run-btn') ? 'chat' : 'editor'
+                        };
+                        
+                        pollOutput(executionId);
+                    }
+                } else {
+                    addTerminalLog(`❌ 错误：${result.error}`, 'error');
+                    if (runBtn) {
+                        runBtn.classList.remove('running');
+                        runBtn.innerHTML = '▶ 运行';
+                    }
+                }
+            } catch (err) {
+                addTerminalLog(`❌ 错误：${err.message}`, 'error');
+                if (runBtn) {
+                    runBtn.classList.remove('running');
+                    runBtn.innerHTML = '▶ 运行';
+                }
+            }
+        }
+
+        async function pollOutput(executionId, targetAbsPath = null, retryCount = 0) {
+            const task = runningTasks[executionId];
+            if (!task || !task.isRunning) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/output', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        execution_id: executionId,
+                        offset: task.offset || 0
+                    })
+                });
+
+                if (!response.ok) {
+                    // 任务不存在（如后端已重启），清理 UI 状态
+                    if (response.status === 404) {
+                        console.log(`任务 ${executionId} 不存在，清理 UI 状态`);
+                        
+                        // 清理 Aider 聊天映射
+                        if (aiderChatMap[executionId]) {
+                            delete aiderChatMap[executionId];
+                        }
+                        
+                        // 清理任务和文件映射
+                        const meta = taskMeta[executionId];
+                        if (meta && meta.filePath) {
+                            delete runningByFile[meta.filePath];
+                        }
+                        delete taskMeta[executionId];
+                        delete runningTasks[executionId];
+                        
+                        // 恢复按钮状态
+                        if (task.runBtn) {
+                            task.runBtn.classList.remove('running');
+                            task.runBtn.innerHTML = '▶ 运行';
+                        }
+                        return;
+                    }
+                    
+                    // 对 500/502 等暂时错误做少量重试
+                    if (response.status >= 500 && retryCount < 5) {
+                        console.log(`轮询遇到 ${response.status} 错误，第 ${retryCount + 1} 次重试...`);
+                        setTimeout(() => pollOutput(executionId, targetAbsPath, retryCount + 1), 300);
+                        return;
+                    }
+                    
+                    console.error(`轮询请求失败: ${response.status}`);
+                    return;
+                }
+
+                const result = await safeJson(response);
+
+                if (response.ok) {
+                    // 更新offset
+                    if (result.offset !== undefined) {
+                        task.offset = result.offset;
+                    }
+                    
+                    if (!result.running) {
+                        // 代码执行完成
+                        if (task.runMode === 'aider') {
+                            // Aider 模式：任务完成
+                            const aiderTask = aiderChatMap[executionId];
+                            if (aiderTask) {
+                                // 追加最终输出
+                                if (result.output) {
+                                    aiderTask.bufferText += result.output;
+                                    const cleaned = cleanAiderOutput(aiderTask.bufferText, aiderTask.prompt);
+                                    aiderTask.contentEl.innerHTML = marked.parse(cleaned || '...');
+                                }
+                                
+                                // 强制刷新文件树和编辑器内容（Aider 完成后实时刷新）
+                                if (currentProjectId) {
+                                    console.log('[DEBUG] Aider 完成，刷新文件树和编辑器');
+                                    selectProject(currentProjectId).then(() => {
+                                        // 文件树刷新完成后，刷新当前编辑器内容
+                                        refreshCurrentEditorFile();
+                                    });
+                                } else {
+                                    // 即使没有项目，也尝试刷新编辑器
+                                    refreshCurrentEditorFile();
+                                }
+                                
+                                // 清理 Aider 聊天映射
+                                delete aiderChatMap[executionId];
+                            }
+                        } else {
+                            // 普通任务：显示到终端
+                            if (result.output) {
+                                addTerminalLog(result.output, 'success');
+                            }
+                        }
+                        
+                        // 只更新对应任务的按钮状态
+                        if (task.runBtn) {
+                            task.runBtn.classList.remove('running');
+                            task.runBtn.innerHTML = '▶ 运行';
+                        }
+                        // 清理任务和文件映射
+                        const meta = taskMeta[executionId];
+                        if (meta && meta.filePath) {
+                            delete runningByFile[meta.filePath];
+                        }
+                        delete taskMeta[executionId];
+                        delete runningTasks[executionId];
+                    } else {
+                        // 检查是否需要输入
+                        if (result.output && result.output.includes('等待用户输入')) {
+                            // 提取提示信息
+                            const match = result.output.match(/等待用户输入: (.+)/);
+                            const prompt = match ? match[1] : '请输入';
+                            
+                            // 显示输出
+                            addTerminalLog(result.output, 'info');
+                            
+                            // 弹出输入框
+                            const user_input = window.prompt(prompt);
+                            if (user_input !== null) {
+                                await sendInput(user_input, executionId);
+                            }
+                        } else if (result.output) {
+                            // 显示输出
+                            if (task.runMode === 'aider') {
+                                // Aider 模式：实时追加到聊天区
+                                const aiderTask = aiderChatMap[executionId];
+                                if (aiderTask) {
+                                    aiderTask.bufferText += result.output;
+                                    const cleaned = cleanAiderOutput(aiderTask.bufferText, aiderTask.prompt);
+                                    aiderTask.contentEl.innerHTML = marked.parse(cleaned || '...');
+                                    chatBox.scrollTop = chatBox.scrollHeight;
+                                }
+                            } else {
+                                // 普通任务：显示到终端
+                                addTerminalLog(result.output, 'info');
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('轮询输出失败:', err);
+            }
+
+            // 继续轮询
+            const currentTask = runningTasks[executionId];
+            if (currentTask && currentTask.isRunning) {
+                setTimeout(() => pollOutput(executionId, targetAbsPath), 100);
+            }
+        }
+
+        async function sendInput(userInput, executionId) {
+            try {
+                await fetchJsonChecked('/api/input', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ execution_id: executionId, input: userInput })
+                });
+            } catch (err) {
+                addTerminalLog(`❌ 发送输入失败：${err.message}`, 'error');
+            }
+        }
+
+        async function stopRunningCode(runBtn, executionId) {
+            if (!executionId) {
+                addTerminalLog('⚠️ 没有可停止的任务', 'info');
+                return;
+            }
+
+            try {
+                const result = await fetchJsonChecked('/api/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ execution_id: executionId })
+                });
+
+                if (result.output) {
+                    addTerminalLog(result.output, 'info');
+                } else {
+                    addTerminalLog('⏹️ 代码已停止', 'info');
+                }
+                if (runBtn) {
+                    runBtn.classList.remove('running');
+                    runBtn.innerHTML = '▶ 运行';
+                }
+                // 清理任务和文件映射
+                const meta = taskMeta[executionId];
+                if (meta && meta.filePath) {
+                    delete runningByFile[meta.filePath];
+                }
+                delete taskMeta[executionId];
+                delete runningTasks[executionId];
+            } catch (err) {
+                addTerminalLog(`❌ 停止失败：${err.message}`, 'error');
+            }
+        }
+
+        /**
+         * 运行编辑器中的代码
+         */
+        async function runEditorCode() {
+            if (!editor) {
+                addTerminalLog('❌ 编辑器未初始化！', 'error');
+                return;
+            }
+
+            const runBtn = document.querySelector('.run-editor-btn');
+            if (!runBtn) return;
+            
+            // 获取当前文件路径
+            const filePath = currentFileData && currentFileData.file_path ? currentFileData.file_path : '';
+            
+            // 检查当前文件是否正在运行
+            const executionId = runningByFile[filePath];
+            
+            if (executionId && runningTasks[executionId]) {
+                // 停止当前文件的任务
+                await stopRunningCode(runBtn, executionId);
+                return;
+            }
+
+            const filename = domElements.editorFileName.textContent;
+
+            if (!filename || filename === '未选择文件') {
+                addTerminalLog('⚠️ 请先打开或保存一个文件！', 'info');
+                return;
+            }
+
+            const ext = filename.split('.').pop().toLowerCase();
+            let language = '';
+
+            if (ext === 'py') {
+                language = 'python';
+            } else if (ext === 'js') {
+                language = 'javascript';
+            } else {
+                addTerminalLog('⚠️ 不支持的文件类型，仅支持 .py 和 .js', 'info');
+                return;
+            }
+
+            const currentProject = projects.find(p => p.id === currentProjectId);
+            const scriptPath = currentFileData && currentFileData.file_path ? currentFileData.file_path : '';
+
+            // 先只对 Python 文件启用 project 模式
+            const canUseProjectMode = (
+                language === 'python' &&
+                currentProject &&
+                currentProject.root_path &&
+                scriptPath
+            );
+
+            if (canUseProjectMode) {
+                // 检查编辑器内容与 currentFileData.content 是否一致
+                if (currentFileData && editor.getValue() !== currentFileData.content) {
+                    addTerminalLog('⚠️ 文件有未保存修改，继续运行将使用磁盘旧版本。请先点击保存。', 'warning');
+                    return;
+                }
+                await runProjectFile(scriptPath, currentProject.root_path, currentProject.id, runBtn);
+            } else {
+                const code = editor.getValue();
+                await runCode(code, language, runBtn);
+            }
+        }
+
+        /**
+         * 运行项目文件（project模式）
+         */
+        async function runProjectFile(scriptPath, cwd, projectId, runBtn) {
+            if (runBtn) {
+                runBtn.classList.add('running');
+                runBtn.innerHTML = '⏹ 停止';
+            }
+
+            const filename = scriptPath.split(/[/\\]/).pop();
+            addTerminalLog(`▶ 运行项目文件：${filename}`, 'info');
+            addTerminalLog(`📁 工作目录：${cwd}`, 'info');
+
+            try {
+                const response = await fetch('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        run_mode: 'project',
+                        script_path: scriptPath,
+                        cwd: cwd,
+                        project_id: projectId,
+                        source: 'editor'
+                    })
+                });
+
+                const result = await safeJson(response);
+
+                if (response.ok) {
+                    const executionId = result.execution_id;
+                    
+                    if (result.output) {
+                        addTerminalLog(result.output, 'success');
+                        
+                        // 如果是Web服务，显示访问地址
+                        if (result.is_web_service === true && result.service_url) {
+                            addTerminalLog('🌐 Web服务已启动，请使用浏览器访问：' + result.service_url, 'info');
+                        }
+                    }
+                    
+                    // 开始轮询输出
+                    if (result.running === true && executionId) {
+                        // 创建任务实例
+                        runningTasks[executionId] = {
+                            runBtn: runBtn,
+                            isRunning: true,
+                            isWebService: result.is_web_service === true,
+                            runMode: 'project'
+                        };
+                        
+                        // 添加到文件映射
+                        runningByFile[scriptPath] = executionId;
+                        taskMeta[executionId] = {
+                            filePath: scriptPath,
+                            runBtn: runBtn,
+                            runMode: 'project',
+                            source: 'editor'
+                        };
+                        
+                        pollOutput(executionId);
+                    }
+                } else {
+                    addTerminalLog(`❌ 错误：${result.error}`, 'error');
+                    if (runBtn) {
+                        runBtn.classList.remove('running');
+                        runBtn.innerHTML = '▶ 运行';
+                    }
+                }
+            } catch (err) {
+                addTerminalLog(`❌ 错误：${err.message}`, 'error');
+                if (runBtn) {
+                    runBtn.classList.remove('running');
+                    runBtn.innerHTML = '▶ 运行';
+                }
+            }
+        }
+
+        /**
+         * 运行Python代码
+         * @param {string} code - Python代码
+         * @param {HTMLElement} preBlock - 代码块元素
+         * @param {HTMLElement} runBtn - 运行按钮
+         */
+        async function runPythonCode(code, preBlock, runBtn) {
+            // AI 代码块使用唯一标识符
+            const uniqueId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const filePath = '__ai_block__' + uniqueId;
+            
+            // 临时存储 filePath 到按钮上，用于停止时查找
+            runBtn.dataset.filePath = filePath;
+            
+            await runCode(code, 'python', runBtn, filePath);
+        }
+
+        /**
+         * 运行JavaScript代码
+         * @param {string} code - JavaScript代码
+         * @param {HTMLElement} preBlock - 代码块元素
+         * @param {HTMLElement} runBtn - 运行按钮
+         */
+        async function runJavaScriptCode(code, preBlock, runBtn) {
+            // AI 代码块使用唯一标识符
+            const uniqueId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const filePath = '__ai_block__' + uniqueId;
+            
+            // 临时存储 filePath 到按钮上，用于停止时查找
+            runBtn.dataset.filePath = filePath;
+            
+            await runCode(code, 'javascript', runBtn, filePath);
+        }
+
+        /**
+         * 清空终端
+         */
+        function clearTerminal() {
+            domElements.terminalOutput.innerHTML = '';
+        }
+
+        /**
+         * 显示 Toast 提示
+         * @param {string} message - 提示消息
+         * @param {string} type - 类型 (success, error, info)
+         */
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 1000);
+        }
+
+        /**
+         * 添加日志到终端
+         * @param {string} message - 日志消息
+         * @param {string} type - 日志类型 (info, success, error)
+         */
+        function addTerminalLog(message, type = 'info') {
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.textContent = message;
+            domElements.terminalOutput.appendChild(logDiv);
+            domElements.terminalOutput.scrollTop = domElements.terminalOutput.scrollHeight;
+        }
+
+        /**
+         * 另存为新文件
+         */
+        async function saveAsNewFile() {
+            if (!currentProjectId) {
+                alert('请先选择一个项目！');
+                return;
+            }
+
+            if (!editor) {
+                alert('编辑器未初始化！');
+                return;
+            }
+
+            const filename = prompt('请输入新文件名（包含扩展名，如：test.py）：', 'new_file.py');
+            if (!filename) return;
+
+            const saveBtn = document.querySelector('.save-btn');
+            saveBtn.classList.add('saving');
+            saveBtn.innerHTML = '⏳ 保存中...';
+
+            try {
+                const content = editor.getValue();
+                const result = await fetchJsonChecked('/api/files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_id: currentProjectId,
+                        filename,
+                        file_path: '',
+                        content,
+                        file_type: ''
+                    })
+                });
+
+                alert('保存成功！');
+                currentFileId = result.id;
+                domElements.editorFileName.textContent = filename;
+                selectProject(currentProjectId);
+            } catch (error) {
+                console.error('保存失败:', error);
+                alert('保存失败：' + error.message);
+            } finally {
+                saveBtn.classList.remove('saving');
+                saveBtn.innerHTML = '💾 保存';
+            }
+        }
+
+        /**
+         * 显示新建项目模态框
+         */
+        function showNewProjectModal() {
+            const projectName = prompt('请输入项目名称：');
+            if (!projectName) return;
+
+            const defaultPath = `${window.location.pathname.split('/').slice(0, -1).join('/')}/projects/${projectName}`.replace(/^\//, '');
+            const rootPath = prompt('请输入项目根目录路径（绝对路径）：', defaultPath);
+            if (!rootPath) return;
+
+            createProject(projectName, rootPath);
+        }
+
+        /**
+         * 创建项目
+         * @param {string} name - 项目名称
+         * @param {string} rootPath - 项目根路径
+         */
+        async function createProject(name, rootPath) {
+            try {
+                await fetchJsonChecked('/api/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, root_path: rootPath })
+                });
+
+                alert('项目创建成功！');
+                loadProjects();
+            } catch (error) {
+                console.error('创建项目失败:', error);
+                alert('创建失败：' + error.message);
+            }
+        }
+
+        /**
+         * 复制到剪贴板
+         * @param {string} text - 要复制的文本
+         * @param {Function} callback - 回调函数
+         */
+        function copyToClipboard(text, callback) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                if (callback) callback();
+            } catch (err) {
+                console.error('复制失败:', err);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        /**
+         * 为代码块添加操作按钮
+         */
+        function addCopyButtons() {
+            document.querySelectorAll('pre code').forEach(codeBlock => {
+                const preBlock = codeBlock.parentNode;
+                if (preBlock.querySelector('.copy-code-btn') || preBlock.querySelector('.save-code-btn') || preBlock.querySelector('.code-run-btn')) {
+                    return;
+                }
+
+                const language = codeBlock.className.replace('hljs language-', '');
+
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-code-btn';
+                copyBtn.textContent = '复制';
+                copyBtn.addEventListener('click', () => {
+                    copyToClipboard(codeBlock.textContent, () => {
+                        copyBtn.textContent = '已复制';
+                        copyBtn.classList.add('copied');
+                        setTimeout(() => {
+                            copyBtn.textContent = '复制';
+                            copyBtn.classList.remove('copied');
+                        }, 2000);
+                    });
+                });
+                preBlock.appendChild(copyBtn);
+
+                const saveBtn = document.createElement('button');
+                saveBtn.className = 'save-code-btn';
+                saveBtn.innerHTML = '💾 保存';
+                saveBtn.addEventListener('click', () => {
+                    showSaveFileDialog(codeBlock.textContent, language);
+                });
+                preBlock.appendChild(saveBtn);
+
+                if (language === 'python' || language === 'py' || language === 'javascript' || language === 'js') {
+                    const runBtn = document.createElement('button');
+                    runBtn.className = 'code-run-btn';
+                    runBtn.innerHTML = '▶ 运行';
+                    runBtn.title = `运行${language === 'python' || language === 'py' ? 'Python' : 'JavaScript'}代码`;
+                    runBtn.addEventListener('click', async () => {
+                        if (runBtn.classList.contains('running')) {
+                            // 使用按钮上存储的 filePath 查找对应的 executionId
+                            const filePath = runBtn.dataset.filePath;
+                            const executionId = filePath ? runningByFile[filePath] : null;
+                            
+                            if (executionId) {
+                                await stopRunningCode(runBtn, executionId);
+                            }
+                            return;
+                        }
+                        
+                        runBtn.classList.add('running');
+                        runBtn.innerHTML = '⏹ 停止';
+                        
+                        if (language === 'python' || language === 'py') {
+                            await runPythonCode(codeBlock.textContent, preBlock, runBtn);
+                        } else if (language === 'javascript' || language === 'js') {
+                            await runJavaScriptCode(codeBlock.textContent, preBlock, runBtn);
+                        }
+                        
+                        // 注意：这里不再立即改回按钮状态
+                        // 按钮状态会在 pollOutput 完成后自动恢复
+                    });
+                    preBlock.appendChild(runBtn);
+                }
+            });
+        }
+
+        /**
+         * 显示保存文件对话框
+         * @param {string} code - 代码内容
+         * @param {string} language - 语言类型
+         */
+        function showSaveFileDialog(code, language) {
+            if (projects.length === 0) {
+                alert('请先创建项目！点击右上角 + 号创建新项目。');
+                return;
+            }
+
+            if (!currentProjectId) {
+                alert('请先选择一个项目！');
+                document.querySelector('.project-list').scrollIntoView({ behavior: 'smooth' });
+                return;
+            }
+
+            const project = projects.find(p => p.id === currentProjectId);
+            const defaultExt = getExtensionFromLanguage(language);
+            const filename = prompt(`请输入文件名（默认扩展名：.${defaultExt}）`, `code_${Date.now()}.${defaultExt}`);
+            if (!filename) return;
+
+            const fullPath = prompt('请输入完整保存路径：', `${project.root_path}\\${filename}`);
+            if (!fullPath) return;
+
+            saveCodeToFile(currentProjectId, filename, fullPath, code, language);
+        }
+
+        /**
+         * 根据语言获取文件扩展名
+         * @param {string} language - 语言类型
+         * @returns {string} 文件扩展名
+         */
+        function getExtensionFromLanguage(language) {
+            const extMap = {
+                'python': 'py', 'py': 'py', 'javascript': 'js', 'js': 'js',
+                'html': 'html', 'css': 'css', 'json': 'json', 'markdown': 'md'
+            };
+            return extMap[language] || 'txt';
+        }
+
+        /**
+         * 保存代码到文件
+         * @param {number} projectId - 项目ID
+         * @param {string} filename - 文件名
+         * @param {string} filePath - 文件路径
+         * @param {string} content - 代码内容
+         * @param {string} language - 语言类型
+         */
+        async function saveCodeToFile(projectId, filename, filePath, content, language) {
+            try {
+                const fileTypes = {
+                    'python': 'python', 'py': 'python', 'javascript': 'javascript', 'js': 'javascript',
+                    'html': 'html', 'css': 'css'
+                };
+
+                await fetchJsonChecked('/api/files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_id: projectId,
+                        filename: filename,
+                        file_path: filePath,
+                        content: content,
+                        file_type: fileTypes[language] || '',
+                        relative_path: filename
+                    })
+                });
+
+                alert(`代码已保存到：${filePath}`);
+                selectProject(projectId);
+            } catch (error) {
+                console.error('保存失败:', error);
+                alert('保存失败：' + error.message);
+            }
+        }
+
+        /**
+         * 发送消息到AI
+         */
+        function send() {
+            const text = input.value.trim();
+            if (!text) return;
+
+            // 根据聊天模式分发
+            if (chatMode === 'ai') {
+                sendAiChat();
+            } else {
+                runAiderFromChat();
+            }
+        }
+
+        function sendAiChat() {
+            const text = input.value.trim();
+
+            lastQuestion = text;
+            chatBox.innerHTML += `<div class="user-msg">${text}</div>`;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-msg';
+
+            const msgActions = document.createElement('div');
+            msgActions.className = 'msg-actions';
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'action-btn';
+            copyBtn.innerHTML = '📋';
+            copyBtn.title = '复制回答';
+            msgActions.appendChild(copyBtn);
+
+            const regenerateBtn = document.createElement('button');
+            regenerateBtn.className = 'action-btn';
+            regenerateBtn.innerHTML = '🔄';
+            regenerateBtn.title = '重新生成';
+            msgActions.appendChild(regenerateBtn);
+
+            const answerContent = document.createElement('div');
+            answerContent.className = 'ai-msg-content';
+
+            aiMsg.appendChild(answerContent);
+            aiMsg.appendChild(msgActions);
+            chatBox.appendChild(aiMsg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            sendBtn.style.display = 'none';
+            stopBtn.style.display = 'inline-block';
+            isGenerating = true;
+            fullResponse = "";
+
+            socket.off('ai_response');
+            socket.on('ai_response', (data) => {
+                const content = data.content;
+                if (content === '[DONE]') {
+                    sendBtn.style.display = 'inline-block';
+                    stopBtn.style.display = 'none';
+                    isGenerating = false;
+                    addCopyButtons();
+                    return;
+                }
+                const rawContent = content.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+                fullResponse += rawContent;
+                aiMsg.querySelector('.ai-msg-content').innerHTML = marked.parse(fullResponse);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
+
+            socket.emit('ask_ai', { message: text });
+        }
+
+        /**
+         * 使用 Aider 编辑代码
+         */
+        async function runAiderFromChat() {
+            const prompt = input.value.trim();
+            if (!prompt) {
+                showToast('请输入要修改的代码描述', 'warning');
+                return;
+            }
+
+            // 校验是否已选择项目
+            if (!currentProjectId) {
+                showToast('请先选择一个项目', 'warning');
+                return;
+            }
+
+            // 获取 Aider 选中的文件（如果有）
+            let targetRelativePath = '';
+            if (aiderSelectedFileId) {
+                try {
+                    const response = await fetch(`/api/files/${aiderSelectedFileId}`);
+                    if (response.ok) {
+                        const fileData = await response.json();
+                        // /api/files/:id 返回扁平对象，直接读取 fileData.project_id / fileData.relative_path
+                        if (fileData.project_id === currentProjectId) {
+                            targetRelativePath = fileData.relative_path;
+                        }
+                    }
+                } catch (error) {
+                    console.error('获取文件信息失败:', error);
+                }
+            }
+
+            // 显示用户消息
+            chatBox.innerHTML += `<div class="user-msg">${prompt}</div>`;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // 创建空的 AI 消息容器（用于实时显示 Aider 输出）
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-msg';
+            const contentEl = document.createElement('div');
+            contentEl.className = 'ai-msg-content';
+            contentEl.innerHTML = '';
+            aiMsg.appendChild(contentEl);
+            chatBox.appendChild(aiMsg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // 调用 /api/run 启动 Aider
+            try {
+                const result = await fetchJsonChecked('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        run_mode: 'aider',
+                        project_id: currentProjectId,
+                        prompt: prompt,
+                        target_relative_path: targetRelativePath,
+                        source: 'chat',
+                        client_id: clientId,
+                        use_selected_context: !!aiderSelectedFileId
+                    })
+                });
+
+                // 记录 Aider 聊天任务映射
+                aiderChatMap[result.execution_id] = {
+                    aiMsgEl: aiMsg,
+                    contentEl: contentEl,
+                    bufferText: '',
+                    prompt: prompt
+                };
+
+                // 创建运行任务记录
+                runningTasks[result.execution_id] = {
+                    isRunning: true,
+                    offset: 0,
+                    runBtn: null,
+                    runMode: 'aider',
+                    targetAbsPath: result.target_abs_path
+                };
+
+                // 开始轮询输出
+                pollOutput(result.execution_id, result.target_abs_path);
+
+            } catch (error) {
+                contentEl.innerHTML = `❌ 错误: ${error.message}`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
+        /**
+         * 停止AI生成
+         */
+        function stopGeneration() {
+            socket.emit('stop_generation');
+            sendBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
+            isGenerating = false;
+        }
+
+        /**
+         * 处理聊天框点击事件
+         */
+        chatBox.addEventListener('click', function(e) {
+            // 处理复制按钮点击
+            const copyBtn = e.target.closest('.action-btn[title="复制回答"]');
+            if (copyBtn) {
+                const msgDiv = copyBtn.closest('.ai-msg');
+                const contentDiv = msgDiv ? msgDiv.querySelector('.ai-msg-content') : null;
+                if (contentDiv) {
+                    copyToClipboard(contentDiv.textContent, () => {
+                        copyBtn.innerHTML = '✅';
+                        setTimeout(() => copyBtn.innerHTML = '📋', 1000);
+                    });
+                }
+            }
+
+            // 处理重新生成按钮点击
+            const regenerateBtn = e.target.closest('.action-btn[title="重新生成"]');
+            if (regenerateBtn) {
+                const allAiMsgs = chatBox.querySelectorAll('.ai-msg');
+                const msgDiv = regenerateBtn.closest('.ai-msg');
+                const isLastMsg = msgDiv === allAiMsgs[allAiMsgs.length - 1];
+
+                if (isLastMsg && lastQuestion) {
+                    msgDiv.querySelector('.ai-msg-content').innerHTML = '';
+                    sendBtn.style.display = 'none';
+                    stopBtn.style.display = 'inline-block';
+                    isGenerating = true;
+                    fullResponse = "";
+                    socket.emit('ask_ai', { message: lastQuestion });
+                }
+            }
+        });
+
+        /**
+         * 处理输入框回车事件
+         */
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') send();
+        });
+
+        // 初始化聊天模式（统一入口，强制设为 ai 模式）
+        applyChatMode('ai', false);
+        
+        // 监听聊天模式变化
+        domElements.chatModeSelect.addEventListener('change', () => {
+            applyChatMode(domElements.chatModeSelect.value, false);
+        });
+
+        // 更新输入框 placeholder
+        function updateInputPlaceholder() {
+            domElements.input.placeholder = '请输入...';
+        }
+
+        // 初始化加载项目列表
+        loadProjects();
+    </script>
+</body>
+</html>
+
+
