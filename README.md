@@ -1,6 +1,6 @@
-# 小熊 AI Web IDE（Flask + SQLite + Aider）
+# 小熊 AI Web IDE（基于大模型API的代码片段自动生成与辅助编码工具）
 
-一个本地运行的 Web IDE：支持项目管理、文件编辑、代码运行、终端输出、普通 AI 聊天（通义千问）和 Aider 代码改写模式。
+基于大模型API的web vibecoding编码工具，支持项目管理、文件编辑、代码运行、终端输出、普通 AI 聊天和 Aider 代码改写两种模式。
 
 ## 1：欢迎界面
 ![小熊AI代码编辑器 - 欢迎界面](images/editor_screenshot1.png)
