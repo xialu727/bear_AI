@@ -66,9 +66,9 @@ def modify_app_run(match_str):
 
 def get_db_connection():
     """获取数据库连接"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
-    # 启用外键约束
+    conn.execute("PRAGMA busy_timeout = 5000")
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
@@ -126,80 +126,116 @@ def sync_project_files(project_id, root_path):
     返回: {"ok": True/False, "file_info_list": [...], "real_count": n, "deleted_count": m, "error": "..."}
     """
     import os as os_module
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # 扫描目录，获取所有真实文件
-        real_files = set()
-        for dirpath, dirnames, filenames in os_module.walk(root_path):
-            # 跳过隐藏目录和 __pycache__
-            dirnames[:] = [d for d in dirnames if not d.startswith('.') and d != '__pycache__']
+    import time
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
             
-            for filename in filenames:
-                # 跳过隐藏文件
-                if filename.startswith('.'):
-                    continue
+            # 扫描目录，获取所有真实文件
+            real_files = set()
+            for dirpath, dirnames, filenames in os_module.walk(root_path):
+                # 跳过隐藏目录和 __pycache__
+                dirnames[:] = [d for d in dirnames if not d.startswith('.') and d != '__pycache__']
                 
-                abs_path = os_module.path.join(dirpath, filename)
-                relative_path = os_module.path.relpath(abs_path, root_path)
-                file_type = filename.split('.')[-1].lower() if '.' in filename else ''
-                file_size = os_module.path.getsize(abs_path)
+                for filename in filenames:
+                    # 跳过隐藏文件
+                    if filename.startswith('.'):
+                        continue
+                    
+                    abs_path = os_module.path.join(dirpath, filename)
+                    relative_path = os_module.path.relpath(abs_path, root_path)
+                    file_type = filename.split('.')[-1].lower() if '.' in filename else ''
+                    file_size = os_module.path.getsize(abs_path)
+                    
+                    real_files.add(abs_path)
+                    
+                    # 检查文件是否已存在
+                    cursor.execute('SELECT id FROM files WHERE file_path = ?', (abs_path,))
+                    existing_file = cursor.fetchone()
+                    
+                    if existing_file:
+                        # 更新现有文件
+                        cursor.execute('''
+                            UPDATE files 
+                            SET filename = ?, relative_path = ?, file_type = ?, file_size = ?
+                            WHERE file_path = ?
+                        ''', (filename, relative_path, file_type, file_size, abs_path))
+                    else:
+                        # 插入新文件
+                        cursor.execute('''
+                            INSERT INTO files (project_id, filename, file_path, relative_path, file_type, file_size)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ''', (project_id, filename, abs_path, relative_path, file_type, file_size))
+            
+            # 删除 DB 里存在但磁盘不存在的记录
+            cursor.execute('SELECT file_path FROM files WHERE project_id = ?', (project_id,))
+            db_files = {row[0] for row in cursor.fetchall()}
+            files_to_delete = db_files - real_files
+            
+            for file_path in files_to_delete:
+                cursor.execute('DELETE FROM files WHERE file_path = ?', (file_path,))
+            
+            conn.commit()
+            
+            # 构建文件信息列表
+            file_info_list = []
+            cursor.execute('SELECT id, file_path, relative_path FROM files WHERE project_id = ?', (project_id,))
+            for row in cursor.fetchall():
+                file_info_list.append({
+                    'file_id': row[0],
+                    'file_path': row[1],
+                    'relative_path': row[2]
+                })
+            
+            return {
+                'ok': True,
+                'file_info_list': file_info_list,
+                'real_count': len(real_files),
+                'deleted_count': len(files_to_delete)
+            }
+            
+        except sqlite3.OperationalError as e:
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass
+                try:
+                    conn.close()
+                except:
+                    pass
+            
+            error_msg = str(e)
+            if 'database is locked' in error_msg and attempt < max_retries - 1:
+                sleep_time = 0.2 * (attempt + 1)
+                print(f"[SYNC] 数据库锁定，等待重试 (attempt {attempt + 1}/{max_retries}, sleep {sleep_time}s): project_id={project_id}, root_path={root_path}", file=sys.stderr)
+                time.sleep(sleep_time)
+                continue
+            else:
+                print(f"[SYNC] 文件同步失败: project_id={project_id}, root_path={root_path}, error={error_msg}", file=sys.stderr)
+                return {'ok': False, 'error': error_msg}
                 
-                real_files.add(abs_path)
-                
-                # 检查文件是否已存在
-                cursor.execute('SELECT id FROM files WHERE file_path = ?', (abs_path,))
-                existing_file = cursor.fetchone()
-                
-                if existing_file:
-                    # 更新现有文件
-                    cursor.execute('''
-                        UPDATE files 
-                        SET filename = ?, relative_path = ?, file_type = ?, file_size = ?
-                        WHERE file_path = ?
-                    ''', (filename, relative_path, file_type, file_size, abs_path))
-                else:
-                    # 插入新文件
-                    cursor.execute('''
-                        INSERT INTO files (project_id, filename, file_path, relative_path, file_type, file_size)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (project_id, filename, abs_path, relative_path, file_type, file_size))
-        
-        # 删除 DB 里存在但磁盘不存在的记录
-        cursor.execute('SELECT file_path FROM files WHERE project_id = ?', (project_id,))
-        db_files = {row[0] for row in cursor.fetchall()}
-        files_to_delete = db_files - real_files
-        
-        for file_path in files_to_delete:
-            cursor.execute('DELETE FROM files WHERE file_path = ?', (file_path,))
-        
-        conn.commit()
-        
-        # 构建文件信息列表
-        file_info_list = []
-        cursor.execute('SELECT id, file_path, relative_path FROM files WHERE project_id = ?', (project_id,))
-        for row in cursor.fetchall():
-            file_info_list.append({
-                'file_id': row[0],
-                'file_path': row[1],
-                'relative_path': row[2]
-            })
-        
-        return {
-            'ok': True,
-            'file_info_list': file_info_list,
-            'real_count': len(real_files),
-            'deleted_count': len(files_to_delete)
-        }
-        
-    except Exception as e:
-        print(f"[DEBUG] 文件同步失败: {str(e)}", file=sys.stderr)
-        return {'ok': False, 'error': str(e)}
-    finally:
-        if conn:
-            conn.close()
+        except Exception as e:
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass
+            error_msg = str(e)
+            print(f"[SYNC] 文件同步失败: project_id={project_id}, root_path={root_path}, error={error_msg}", file=sys.stderr)
+            return {'ok': False, 'error': error_msg}
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
+    
+    return {'ok': False, 'error': '同步失败：超过最大重试次数'}
 
 
 def init_database():
@@ -707,6 +743,7 @@ def run_aider_mode(execution_id, project_id, prompt, target_relative_path, sourc
         clean_env['OPENAI_API_KEY'] = api_key
         clean_env['OPENAI_API_BASE'] = 'https://api.deepseek.com'
         clean_env['PYTHONUNBUFFERED'] = '1'  # 确保 Python 输出不被缓冲
+        clean_env['PYTHONIOENCODING'] = 'utf-8'  # 解决 Windows 终端 GBK 编码问题
         clean_env.pop('AIDER_MODEL', None)  # 避免被旧环境变量覆盖成 deepseek-chat
         
         # 使用子进程执行 Aider
@@ -731,7 +768,7 @@ def run_aider_mode(execution_id, project_id, prompt, target_relative_path, sourc
             if target_abs:
                 aider_cmd.extend(['--file', target_abs])
             
-            # 打开临时文件用于写入输出（使用行缓冲和 GBK 编码）
+            # 打开临时文件用于写入输出（使用行缓冲，读取时多编码兼容）
             temp_output_file = open(temp_output_path, 'w', encoding='gbk', buffering=1)
             
             # 设置工作目录（Windows 下使用 CREATE_NEW_PROCESS_GROUP）
@@ -843,6 +880,8 @@ def run_project_file(execution_id, script_path, cwd, project_id, source):
     env_vars_to_remove = ['WERKZEUG_RUN_MAIN', 'WERKZEUG_SERVER_FD', 'FLASK_RUN_FROM_CLI']
     for var in env_vars_to_remove:
         clean_env.pop(var, None)
+    # 设置 Python 输出编码为 UTF-8，解决 Windows 终端 GBK 编码问题
+    clean_env['PYTHONIOENCODING'] = 'utf-8'
     
     # 使用子进程执行项目文件（Windows上设置进程组以便终止整个进程树）
     try:
@@ -1218,6 +1257,7 @@ with open(r"{temp_output_path}", 'w', encoding='utf-8') as f:
         env_vars_to_remove = ['WERKZEUG_RUN_MAIN', 'WERKZEUG_SERVER_FD', 'FLASK_RUN_FROM_CLI']
         for var in env_vars_to_remove:
             clean_env.pop(var, None)
+        clean_env['PYTHONIOENCODING'] = 'utf-8'  # 解决 Windows 终端 GBK 编码问题
         
         # 使用子进程执行代码（Windows上设置进程组以便终止整个进程树）
         try:
