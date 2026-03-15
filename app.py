@@ -13,6 +13,35 @@ import tempfile
 import atexit
 import datetime
 
+
+def read_text_auto(path, offset=0):
+    """统一解码函数（BOM 识别 + 严格回退）
+    
+    Args:
+        path: 文件路径
+        offset: 读取偏移量
+        
+    Returns:
+        (text, new_offset): (读取的文本, 新的偏移量)
+    """
+    with open(path, 'rb') as f:
+        raw = f.read()
+    
+    if raw.startswith(b'\xef\xbb\xbf'):
+        text = raw.decode('utf-8-sig')
+    elif raw.startswith(b'\xff\xfe') or raw.startswith(b'\xfe\xff'):
+        text = raw.decode('utf-16')
+    else:
+        try:
+            text = raw.decode('utf-8')
+        except UnicodeDecodeError:
+            text = raw.decode('gbk', errors='replace')
+    
+    if offset:
+        return text[offset:], len(text)
+    return text, len(text)
+
+
 # 初始化Flask应用
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'simple-key'
@@ -769,7 +798,7 @@ def run_aider_mode(execution_id, project_id, prompt, target_relative_path, sourc
                 aider_cmd.extend(['--file', target_abs])
             
             # 打开临时文件用于写入输出（使用行缓冲，读取时多编码兼容）
-            temp_output_file = open(temp_output_path, 'w', encoding='gbk', buffering=1)
+            temp_output_file = open(temp_output_path, 'w', encoding='utf-8-sig', buffering=1)
             
             # 设置工作目录（Windows 下使用 CREATE_NEW_PROCESS_GROUP）
             if os_module.name == 'nt':
@@ -886,7 +915,7 @@ def run_project_file(execution_id, script_path, cwd, project_id, source):
     # 使用子进程执行项目文件（Windows上设置进程组以便终止整个进程树）
     try:
         # 打开临时文件用于写入输出
-        temp_output_file = open(temp_output_path, 'w', encoding='utf-8')
+        temp_output_file = open(temp_output_path, 'w', encoding='utf-8-sig')
         
         if os_module.name == 'nt':
             # Windows: 创建新进程组
@@ -1175,7 +1204,7 @@ def run_code():
             code = re.sub(r'HTTPServer\([^)]*\)', 'HTTPServer(("0.0.0.0", 8000), handler)', code)
         
         # 创建临时文件来存储输出
-        temp_output = tempfile.NamedTemporaryFile(mode='w+', delete=False, encoding='utf-8')
+        temp_output = tempfile.NamedTemporaryFile(mode='w+', delete=False, encoding='utf-8-sig')
         temp_output_path = temp_output.name
         temp_output.close()
         
@@ -1188,7 +1217,7 @@ def run_code():
 import io
 
 # 重定向stdout和stderr到临时文件
-with open(r"{temp_output_path}", 'w', encoding='utf-8') as f:
+with open(r"{temp_output_path}", 'w', encoding='utf-8-sig') as f:
     sys.stdout = f
     sys.stderr = f
     
@@ -1405,8 +1434,7 @@ def stop_code():
                 
                 # 读取输出文件
                 try:
-                    with open(temp_output_path, 'r', encoding='utf-8') as f:
-                        output = f.read()
+                    output, _ = read_text_auto(temp_output_path, 0)
                     if not output:
                         output = "⏹️ 代码已停止"
                 except:
@@ -1500,25 +1528,11 @@ def get_output():
                 # 尝试多种编码读取输出文件（增量）
                 output = None
                 new_offset = offset
-                for encoding in ['gbk', 'utf-8', 'gb2312', 'utf-16']:
-                    try:
-                        with open(temp_output_path, 'r', encoding=encoding) as f:
-                            # 跳过已读取的内容
-                            if offset > 0:
-                                f.seek(offset)
-                            # 读取新增内容
-                            output = f.read()
-                            # 返回新的offset（文件当前位置）
-                            new_offset = f.tell()
-                        print(f"[DEBUG] 成功使用 {encoding} 编码读取 Aider 输出（增量完成）")
-                        break
-                    except UnicodeDecodeError:
-                        continue
-                    except Exception as e:
-                        print(f"[DEBUG] 使用 {encoding} 编码读取失败: {e}")
-                        continue
-                
-                if output is None:
+                try:
+                    output, new_offset = read_text_auto(temp_output_path, offset)
+                    print(f"[DEBUG] 成功使用自动编码读取输出（增量完成）")
+                except Exception as e:
+                    print(f"[DEBUG] 读取输出文件失败: {e}")
                     output = ""
                     new_offset = offset
                 
@@ -1585,25 +1599,12 @@ def get_output():
                 
                 # 尝试多种编码读取输出文件
                 output = None
-                for encoding in ['gbk', 'utf-8', 'gb2312', 'utf-16']:
-                    try:
-                        with open(temp_output_path, 'r', encoding=encoding) as f:
-                            # 跳过已读取的内容
-                            if offset > 0:
-                                f.seek(offset)
-                            # 读取新增内容
-                            output = f.read()
-                            # 返回新的offset（文件当前位置）
-                            new_offset = f.tell()
-                        print(f"[DEBUG] 成功使用 {encoding} 编码读取 Aider 输出（增量）")
-                        break
-                    except UnicodeDecodeError:
-                        continue
-                    except Exception as e:
-                        print(f"[DEBUG] 使用 {encoding} 编码读取失败: {e}")
-                        continue
-                
-                if output is None:
+                new_offset = offset
+                try:
+                    output, new_offset = read_text_auto(temp_output_path, offset)
+                    print(f"[DEBUG] 成功使用自动编码读取输出（增量）")
+                except Exception as e:
+                    print(f"[DEBUG] 读取输出文件失败: {e}")
                     output = ""
                     new_offset = offset
                 

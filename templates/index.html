@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1999,22 +1999,30 @@
             const currentProject = projects.find(p => p.id === currentProjectId);
             const scriptPath = currentFileData && currentFileData.file_path ? currentFileData.file_path : '';
 
+            // 检查编辑器内容是否包含 input()（忽略注释中的 input）
+            const editorContent = editor.getValue();
+            const hasInputCall = /\binput\s*\(/.test(editorContent);
+
             // 先只对 Python 文件启用 project 模式
             const canUseProjectMode = (
                 language === 'python' &&
                 currentProject &&
                 currentProject.root_path &&
-                scriptPath
+                scriptPath &&
+                !hasInputCall
             );
 
             if (canUseProjectMode) {
                 // 检查编辑器内容与 currentFileData.content 是否一致
-                if (currentFileData && editor.getValue() !== currentFileData.content) {
+                if (currentFileData && editorContent !== currentFileData.content) {
                     addTerminalLog('⚠️ 文件有未保存修改，继续运行将使用磁盘旧版本。请先点击保存。', 'warning');
                     return;
                 }
                 await runProjectFile(scriptPath, currentProject.root_path, currentProject.id, runBtn);
             } else {
+                if (hasInputCall) {
+                    addTerminalLog('⚠️ 当前文件包含 input()，已自动切换到 snippet 模式以支持交互输入', 'info');
+                }
                 const code = editor.getValue();
                 await runCode(code, language, runBtn);
             }

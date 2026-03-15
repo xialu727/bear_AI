@@ -2888,3 +2888,731 @@ sys.exit()
 > Create new file? (Y)es/(N)o [Yes]: y  
 > Applied edit to heart_display.py  
 > summarizer unexpectedly failed for all models  
+
+# aider chat started at 2026-03-15 18:30:49
+
+> D:\python3.12.9\Lib\site-packages\aider\__main__.py --message 在当前文件夹用python写一个五子棋小游戏 --yes-always --no-gitignore --exit --no-fancy-input --no-pretty --no-show-model-warnings --no-git --model openai/deepseek-chat --openai-api-base https://api.deepseek.com --openai-api-key ...b7e1 --file C:\Users\30599\Desktop\python_ai_bot\projects\贪吃蛇\五子棋.py  
+> Aider v0.86.2  
+> Model: openai/deepseek-chat with whole edit format  
+> Git repo: none  
+> Repo-map: disabled  
+> Added 五子棋.py to the chat.  
+> Note: in-chat filenames are always relative to the git working dir, not the current working dir.  
+> Cur working dir: C:\Users\30599\Desktop\python_ai_bot\projects\贪吃蛇  
+> Git working dir: C:\Users\30599\Desktop\python_ai_bot  
+
+#### 在当前文件夹用python写一个五子棋小游戏  
+
+我将创建一个简单的命令行五子棋游戏。由于当前文件是空的，我将编写完整的代码。
+
+五子棋.py
+```
+import os
+
+class Gomoku:
+    def __init__(self, size=15):
+        self.size = size
+        self.board = [[' ' for _ in range(size)] for _ in range(size)]
+        self.current_player = 'X'  # X先手
+        self.game_over = False
+        self.winner = None
+        
+    def print_board(self):
+        """打印棋盘"""
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print("   " + " ".join(f"{i:2}" for i in range(self.size)))
+        print("  +" + "--" * self.size + "-")
+        
+        for i in range(self.size):
+            row = f"{i:2}|"
+            for j in range(self.size):
+                row += f" {self.board[i][j]}"
+            print(row)
+    
+    def make_move(self, row, col):
+        """落子"""
+        if not (0 <= row < self.size and 0 <= col < self.size):
+            print("位置超出棋盘范围！")
+            return False
+            
+        if self.board[row][col] != ' ':
+            print("该位置已有棋子！")
+            return False
+            
+        self.board[row][col] = self.current_player
+        
+        # 检查是否获胜
+        if self.check_win(row, col):
+            self.game_over = True
+            self.winner = self.current_player
+            return True
+            
+        # 切换玩家
+        self.current_player = 'O' if self.current_player == 'X' else 'X'
+        return True
+    
+    def check_win(self, row, col):
+        """检查是否五子连珠"""
+        player = self.board[row][col]
+        
+        # 检查方向: 水平、垂直、对角线、反对角线
+        directions = [
+            [(0, 1), (0, -1)],   # 水平
+            [(1, 0), (-1, 0)],   # 垂直
+            [(1, 1), (-1, -1)],  # 对角线
+            [(1, -1), (-1, 1)]   # 反对角线
+        ]
+        
+        for dir_pair in directions:
+            count = 1  # 当前位置已经有一个棋子
+            
+            # 检查每个方向的两个相反方向
+            for dx, dy in dir_pair:
+                temp_row, temp_col = row, col
+                
+                while True:
+                    temp_row += dx
+                    temp_col += dy
+                    
+                    if not (0 <= temp_row < self.size and 0 <= temp_col < self.size):
+                        break
+                        
+                    if self.board[temp_row][temp_col] == player:
+                        count += 1
+                    else:
+                        break
+                
+                if count >= 5:
+                    return True
+                    
+            # 重置计数进行下一个方向的检查
+            count = 1
+            
+        return False
+    
+    def play(self):
+        """开始游戏"""
+        print("欢迎来到五子棋游戏！")
+        print("玩家X使用X，玩家O使用O")
+        print("输入行号和列号来落子（例如：7 7）")
+        print("输入q退出游戏")
+        print("-" * 30)
+        
+        while not self.game_over:
+            self.print_board()
+            print(f"\n当前玩家: {self.current_player}")
+            
+            try:
+                user_input = input("请输入行号和列号（用空格分隔）: ").strip()
+                
+                if user_input.lower() == 'q':
+                    print("游戏结束！")
+                    break
+                
+                if not user_input:
+                    continue
+                    
+                parts = user_input.split()
+                if len(parts) != 2:
+                    print("请输入两个数字，用空格分隔！")
+                    input("按回车键继续...")
+                    continue
+                
+                row, col = map(int, parts)
+                
+                if self.make_move(row, col):
+                    if self.game_over:
+                        self.print_board()
+                        print(f"\n恭喜！玩家 {self.winner} 获胜！")
+                        break
+                else:
+                    input("按回车键继续...")
+                    
+            except ValueError:
+                print("请输入有效的数字！")
+                input("按回车键继续...")
+            except KeyboardInterrupt:
+                print("\n游戏结束！")
+                break
+        
+        print("游戏结束！")
+
+if __name__ == "__main__":
+    game = Gomoku()
+    game.play()
+```
+
+这个五子棋游戏包含以下功能：
+
+1. **15×15的棋盘**：标准五子棋棋盘大小
+2. **双人游戏**：玩家X和玩家O轮流下棋
+3. **输入验证**：检查位置是否有效、是否已有棋子
+4. **胜负判断**：检查水平、垂直、对角线、反对角线四个方向是否有五子连珠
+5. **清屏功能**：每次落子后清屏重新显示棋盘
+6. **退出功能**：输入q可以随时退出游戏
+
+游戏玩法：
+- 运行程序后，棋盘会显示出来
+- 玩家输入行号和列号（例如：7 7表示第7行第7列）
+- 游戏会自动检查胜负
+- 当一方获胜时，游戏结束并显示获胜者
+
+要运行游戏，只需执行：
+```
+python 五子棋.py
+```
+
+> Tokens: 679 sent, 1.4k received.  
+> 要运行游戏，只需执行：  
+> Create new file? (Y)es/(N)o [Yes]: y  
+> Applied edit to 五子棋.py  
+> Applied edit to 要运行游戏，只需执行：  
+> summarizer unexpectedly failed for all models  
+
+# aider chat started at 2026-03-15 18:52:27
+
+> D:\python3.12.9\Lib\site-packages\aider\__main__.py --message 更改当前文件，实现打印一个爱心的效果 名字也该成爱心.py --yes-always --no-gitignore --exit --no-fancy-input --no-pretty --no-show-model-warnings --no-git --model openai/deepseek-chat --openai-api-base https://api.deepseek.com --openai-api-key ...b7e1 --file C:\Users\30599\Desktop\python_ai_bot\projects\贪吃蛇\五子棋.py  
+> Aider v0.86.2  
+> Model: openai/deepseek-chat with whole edit format  
+> Git repo: none  
+> Repo-map: disabled  
+> Added 五子棋.py to the chat.  
+> Note: in-chat filenames are always relative to the git working dir, not the current working dir.  
+> Cur working dir: C:\Users\30599\Desktop\python_ai_bot\projects\贪吃蛇  
+> Git working dir: C:\Users\30599\Desktop\python_ai_bot  
+
+#### 更改当前文件，实现打印一个爱心的效果 名字也该成爱心.py  
+
+我理解您的要求。您希望将当前文件从计算两个数字之和改为打印一个爱心图案，并且将文件名改为“爱心.py”。
+
+我将创建一个新的爱心图案，使用字符来绘制一个简单的爱心形状。同时，我会将文件名更改为“爱心.py”。
+
+爱心.py
+```
+# 打印爱心图案
+def print_heart():
+    # 使用字符绘制爱心
+    heart = [
+        "  ****     ****  ",
+        " ******   ****** ",
+        "******** ********",
+        " *************** ",
+        "  *************  ",
+        "   ***********   ",
+        "    *********    ",
+        "     *******     ",
+        "      *****      ",
+        "       ***       ",
+        "        *        "
+    ]
+    
+    for line in heart:
+        print(line)
+
+# 主程序
+if __name__ == "__main__":
+    print_heart()
+```
+
+这个程序会打印一个由星号(*)组成的爱心图案。图案由多行字符串组成，每行包含不同数量的星号来形成爱心的形状。程序定义了一个`print_heart()`函数来打印这个图案，然后在主程序中调用它。
+
+> Tokens: 747 sent, 317 received.  
+> 爱心.py  
+> Create new file? (Y)es/(N)o [Yes]: y  
+> Applied edit to 爱心.py  
+
+# aider chat started at 2026-03-15 18:54:00
+
+> D:\python3.12.9\Lib\site-packages\aider\__main__.py --message 你知道你现在在哪个文件夹吗 --yes-always --no-gitignore --exit --no-fancy-input --no-pretty --no-show-model-warnings --no-git --model openai/deepseek-chat --openai-api-base https://api.deepseek.com --openai-api-key ...b7e1 --file C:\Users\30599\Desktop\python_ai_bot\projects\贪吃蛇\五子棋.py  
+> Aider v0.86.2  
+> Model: openai/deepseek-chat with whole edit format  
+> Git repo: none  
+> Repo-map: disabled  
+> Added 五子棋.py to the chat.  
+> Note: in-chat filenames are always relative to the git working dir, not the current working dir.  
+> Cur working dir: C:\Users\30599\Desktop\python_ai_bot\projects\贪吃蛇  
+> Git working dir: C:\Users\30599\Desktop\python_ai_bot  
+
+#### 你知道你现在在哪个文件夹吗  
+
+我不知道当前在哪个文件夹，因为我没有访问文件系统的能力。我只能根据您提供的文件内容进行编辑。
+
+如果您想让我修改文件，请告诉我具体的更改要求。目前我看到您提供了一个名为“五子棋.py”的文件，但它的内容是一个简单的加法计算器，而不是五子棋游戏。您希望我如何修改这个文件？
+
+请说明您希望进行的更改。
+
+> Tokens: 736 sent, 136 received.  
+
+# aider chat started at 2026-03-15 18:54:26
+
+> D:\python3.12.9\Lib\site-packages\aider\__main__.py --message 这个文件的名字你可以做修改吗 --yes-always --no-gitignore --exit --no-fancy-input --no-pretty --no-show-model-warnings --no-git --model openai/deepseek-chat --openai-api-base https://api.deepseek.com --openai-api-key ...b7e1 --file C:\Users\30599\Desktop\python_ai_bot\projects\贪吃蛇\五子棋.py  
+> Aider v0.86.2  
+> Model: openai/deepseek-chat with whole edit format  
+> Git repo: none  
+> Repo-map: disabled  
+> Added 五子棋.py to the chat.  
+> Note: in-chat filenames are always relative to the git working dir, not the current working dir.  
+> Cur working dir: C:\Users\30599\Desktop\python_ai_bot\projects\贪吃蛇  
+> Git working dir: C:\Users\30599\Desktop\python_ai_bot  
+
+#### 这个文件的名字你可以做修改吗  
+
+我注意到您想修改文件名。当前文件名为“五子棋.py”，但文件内容是一个简单的两数相加计算器，与五子棋游戏无关。因此，我将文件重命名为一个更合适的名称，例如“两数相加.py”。
+
+两数相加.py
+```
+# 获取用户输入
+num1 = float(input("请输入第一个数字："))
+num2 = float(input("请输入第二个数字："))
+
+# 计算和
+result = num1 + num2
+
+# 输出结果
+print("两数之和为：", result)
+```
+
+> Tokens: 734 sent, 142 received.  
+> 两数相加.py  
+> Create new file? (Y)es/(N)o [Yes]: y  
+> Applied edit to 两数相加.py  
+
+# aider chat started at 2026-03-15 18:59:21
+
+> D:\python3.12.9\Lib\site-packages\aider\__main__.py --message 请用python实现一个五子棋小游戏 --yes-always --no-gitignore --exit --no-fancy-input --no-pretty --no-show-model-warnings --no-git --model openai/deepseek-chat --openai-api-base https://api.deepseek.com --openai-api-key ...b7e1 --file c:\Users\30599\Desktop\python_ai_bot\projects\前后端分离登录系统\五子棋.py  
+> Aider v0.86.2  
+> Model: openai/deepseek-chat with whole edit format  
+> Git repo: none  
+> Repo-map: disabled  
+> Added 五子棋.py to the chat.  
+> Note: in-chat filenames are always relative to the git working dir, not the current working dir.  
+> Cur working dir: c:\Users\30599\Desktop\python_ai_bot\projects\前后端分离登录系统  
+> Git working dir: c:\Users\30599\Desktop\python_ai_bot  
+
+#### 请用python实现一个五子棋小游戏  
+
+我将创建一个简单的命令行五子棋游戏。游戏将包含以下功能：
+1. 15x15的棋盘
+2. 两名玩家轮流下棋（黑棋和白棋）
+3. 判断胜负（横、竖、斜连成五子）
+4. 简单的用户界面
+
+由于当前文件是空的，我将创建完整的游戏代码。
+
+五子棋.py
+```
+import os
+
+class Gomoku:
+    def __init__(self, board_size=15):
+        self.board_size = board_size
+        self.board = [['.' for _ in range(board_size)] for _ in range(board_size)]
+        self.current_player = 'B'  # B: 黑棋, W: 白棋
+        self.game_over = False
+        self.winner = None
+        
+    def print_board(self):
+        """打印棋盘"""
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print("   " + " ".join([f"{i:2}" for i in range(self.board_size)]))
+        for i in range(self.board_size):
+            print(f"{i:2} " + " ".join([f"{self.board[i][j]:2}" for j in range(self.board_size)]))
+        print(f"\n当前玩家: {'黑棋(B)' if self.current_player == 'B' else '白棋(W)'}")
+        
+    def make_move(self, row, col):
+        """落子"""
+        if not (0 <= row < self.board_size and 0 <= col < self.board_size):
+            print("位置超出棋盘范围！")
+            return False
+            
+        if self.board[row][col] != '.':
+            print("该位置已有棋子！")
+            return False
+            
+        self.board[row][col] = self.current_player
+        
+        # 检查是否获胜
+        if self.check_win(row, col):
+            self.game_over = True
+            self.winner = self.current_player
+            return True
+            
+        # 切换玩家
+        self.current_player = 'W' if self.current_player == 'B' else 'B'
+        return True
+        
+    def check_win(self, row, col):
+        """检查是否获胜"""
+        player = self.board[row][col]
+        
+        # 检查的八个方向：水平、垂直、两个对角线
+        directions = [
+            (0, 1),   # 水平向右
+            (1, 0),   # 垂直向下
+            (1, 1),   # 右下对角线
+            (1, -1)   # 左下对角线
+        ]
+        
+        for dr, dc in directions:
+            count = 1  # 当前位置已经有一个棋子
+            
+            # 正向检查
+            r, c = row + dr, col + dc
+            while 0 <= r < self.board_size and 0 <= c < self.board_size and self.board[r][c] == player:
+                count += 1
+                r += dr
+                c += dc
+                
+            # 反向检查
+            r, c = row - dr, col - dc
+            while 0 <= r < self.board_size and 0 <= c < self.board_size and self.board[r][c] == player:
+                count += 1
+                r -= dr
+                c -= dc
+                
+            if count >= 5:
+                return True
+                
+        return False
+        
+    def play(self):
+        """开始游戏"""
+        print("欢迎来到五子棋游戏！")
+        print("黑棋(B)先手，白棋(W)后手")
+        print("输入行号和列号来落子（例如：7 7）")
+        print("输入'q'退出游戏\n")
+        
+        while not self.game_over:
+            self.print_board()
+            
+            try:
+                user_input = input("\n请输入行号和列号（用空格分隔）: ").strip()
+                
+                if user_input.lower() == 'q':
+                    print("游戏结束！")
+                    break
+                    
+                if not user_input:
+                    continue
+                    
+                parts = user_input.split()
+                if len(parts) != 2:
+                    print("请输入两个数字，用空格分隔！")
+                    continue
+                    
+                row, col = map(int, parts)
+                
+                if self.make_move(row, col):
+                    if self.game_over:
+                        self.print_board()
+                        winner_name = "黑棋" if self.winner == 'B' else "白棋"
+                        print(f"\n恭喜！{winner_name}获胜！")
+                        break
+                else:
+                    input("按回车键继续...")
+                    
+            except ValueError:
+                print("请输入有效的数字！")
+                input("按回车键继续...")
+            except KeyboardInterrupt:
+                print("\n游戏结束！")
+                break
+
+if __name__ == "__main__":
+    game = Gomoku()
+    game.play()
+```
+
+这个五子棋游戏包含以下特点：
+1. 15×15的标准棋盘
+2. 黑棋先手，白棋后手
+3. 每次落子后自动检查胜负
+4. 清屏显示当前棋盘状态
+5. 输入验证（防止超出边界、重复落子等）
+6. 支持输入'q'退出游戏
+
+游戏规则：
+- 玩家轮流输入行号和列号（从0开始）
+- 当同一颜色的棋子在横、竖、斜任意方向连成五子时获胜
+- 游戏结束后显示获胜方
+
+要运行游戏，只需执行该Python文件即可。
+
+> Tokens: 676 sent, 1.4k received.  
+> Applied edit to 五子棋.py  
+> summarizer unexpectedly failed for all models  
+
+# aider chat started at 2026-03-15 19:01:14
+
+> D:\python3.12.9\Lib\site-packages\aider\__main__.py --message 改成用pygame实现 --yes-always --no-gitignore --exit --no-fancy-input --no-pretty --no-show-model-warnings --no-git --model openai/deepseek-chat --openai-api-base https://api.deepseek.com --openai-api-key ...b7e1 --file c:\Users\30599\Desktop\python_ai_bot\projects\前后端分离登录系统\五子棋.py  
+> Aider v0.86.2  
+> Model: openai/deepseek-chat with whole edit format  
+> Git repo: none  
+> Repo-map: disabled  
+> Added 五子棋.py to the chat.  
+> Note: in-chat filenames are always relative to the git working dir, not the current working dir.  
+> Cur working dir: c:\Users\30599\Desktop\python_ai_bot\projects\前后端分离登录系统  
+> Git working dir: c:\Users\30599\Desktop\python_ai_bot  
+
+#### 改成用pygame实现  
+
+我将把五子棋游戏从命令行版本改为使用 Pygame 实现的图形界面版本。这需要完全重写代码，添加 Pygame 的初始化、图形绘制、鼠标交互等功能。
+
+五子棋.py
+```
+import pygame
+import sys
+
+# 初始化 Pygame
+pygame.init()
+
+# 颜色定义
+BACKGROUND = (220, 179, 92)  # 棋盘背景色 (米黄色)
+LINE_COLOR = (0, 0, 0)       # 棋盘线颜色 (黑色)
+BLACK = (0, 0, 0)            # 黑棋
+WHITE = (255, 255, 255)      # 白棋
+RED = (255, 0, 0)            # 红色 (用于提示)
+TEXT_COLOR = (50, 50, 50)    # 文字颜色
+
+class Gomoku:
+    def __init__(self, board_size=15):
+        self.board_size = board_size
+        self.board = [['.' for _ in range(board_size)] for _ in range(board_size)]
+        self.current_player = 'B'  # B: 黑棋, W: 白棋
+        self.game_over = False
+        self.winner = None
+        
+        # Pygame 设置
+        self.cell_size = 40  # 每个格子的像素大小
+        self.margin = 50     # 边距
+        self.radius = 18     # 棋子半径
+        
+        # 计算窗口大小
+        self.width = 2 * self.margin + (board_size - 1) * self.cell_size
+        self.height = 2 * self.margin + (board_size - 1) * self.cell_size + 100  # 额外空间显示信息
+        
+        # 创建窗口
+        self.screen = pygame.display.set_mode((self.width, self.height))
+        pygame.display.set_caption("五子棋")
+        
+        # 字体
+        self.font = pygame.font.SysFont(None, 32)
+        self.small_font = pygame.font.SysFont(None, 24)
+        
+    def draw_board(self):
+        """绘制棋盘"""
+        # 填充背景色
+        self.screen.fill(BACKGROUND)
+        
+        # 绘制棋盘线
+        for i in range(self.board_size):
+            # 横线
+            start_pos = (self.margin, self.margin + i * self.cell_size)
+            end_pos = (self.width - self.margin, self.margin + i * self.cell_size)
+            pygame.draw.line(self.screen, LINE_COLOR, start_pos, end_pos, 2)
+            
+            # 竖线
+            start_pos = (self.margin + i * self.cell_size, self.margin)
+            end_pos = (self.margin + i * self.cell_size, self.height - self.margin - 100)
+            pygame.draw.line(self.screen, LINE_COLOR, start_pos, end_pos, 2)
+        
+        # 绘制棋盘上的点 (天元和星)
+        points = [(3, 3), (3, 11), (7, 7), (11, 3), (11, 11)]
+        for row, col in points:
+            x = self.margin + col * self.cell_size
+            y = self.margin + row * self.cell_size
+            pygame.draw.circle(self.screen, LINE_COLOR, (x, y), 5)
+        
+    def draw_pieces(self):
+        """绘制棋子"""
+        for row in range(self.board_size):
+            for col in range(self.board_size):
+                if self.board[row][col] != '.':
+                    x = self.margin + col * self.cell_size
+                    y = self.margin + row * self.cell_size
+                    
+                    color = BLACK if self.board[row][col] == 'B' else WHITE
+                    pygame.draw.circle(self.screen, color, (x, y), self.radius)
+                    
+                    # 为白棋添加黑色边框
+                    if self.board[row][col] == 'W':
+                        pygame.draw.circle(self.screen, BLACK, (x, y), self.radius, 1)
+    
+    def draw_info(self):
+        """绘制游戏信息"""
+        # 当前玩家信息
+        player_text = "当前玩家: 黑棋" if self.current_player == 'B' else "当前玩家: 白棋"
+        player_color = BLACK if self.current_player == 'B' else WHITE
+        
+        # 绘制当前玩家指示器
+        indicator_x = self.width // 2 - 100
+        indicator_y = self.height - 80
+        pygame.draw.circle(self.screen, player_color, (indicator_x, indicator_y), 15)
+        if self.current_player == 'W':
+            pygame.draw.circle(self.screen, BLACK, (indicator_x, indicator_y), 15, 1)
+        
+        # 绘制文字
+        text_surface = self.font.render(player_text, True, TEXT_COLOR)
+        self.screen.blit(text_surface, (indicator_x + 30, indicator_y - 15))
+        
+        # 游戏状态
+        if self.game_over:
+            winner_text = "黑棋获胜!" if self.winner == 'B' else "白棋获胜!"
+            text_surface = self.font.render(winner_text, True, RED)
+            self.screen.blit(text_surface, (self.width // 2 - 60, self.height - 40))
+        else:
+            # 操作提示
+            hint_text = "点击棋盘落子 | R: 重新开始 | ESC: 退出"
+            text_surface = self.small_font.render(hint_text, True, TEXT_COLOR)
+            self.screen.blit(text_surface, (self.width // 2 - 120, self.height - 40))
+    
+    def get_board_position(self, mouse_pos):
+        """将鼠标位置转换为棋盘坐标"""
+        x, y = mouse_pos
+        
+        # 检查是否在棋盘范围内
+        if (x < self.margin - self.cell_size // 2 or 
+            x > self.width - self.margin + self.cell_size // 2 or
+            y < self.margin - self.cell_size // 2 or 
+            y > self.height - self.margin - 100 + self.cell_size // 2):
+            return None, None
+        
+        # 计算最近的交叉点
+        col = round((x - self.margin) / self.cell_size)
+        row = round((y - self.margin) / self.cell_size)
+        
+        # 确保在棋盘范围内
+        if 0 <= row < self.board_size and 0 <= col < self.board_size:
+            return row, col
+        return None, None
+    
+    def make_move(self, row, col):
+        """落子"""
+        if not (0 <= row < self.board_size and 0 <= col < self.board_size):
+            return False
+            
+        if self.board[row][col] != '.':
+            return False
+            
+        self.board[row][col] = self.current_player
+        
+        # 检查是否获胜
+        if self.check_win(row, col):
+            self.game_over = True
+            self.winner = self.current_player
+            return True
+            
+        # 切换玩家
+        self.current_player = 'W' if self.current_player == 'B' else 'B'
+        return True
+        
+    def check_win(self, row, col):
+        """检查是否获胜"""
+        player = self.board[row][col]
+        
+        # 检查的八个方向：水平、垂直、两个对角线
+        directions = [
+            (0, 1),   # 水平向右
+            (1, 0),   # 垂直向下
+            (1, 1),   # 右下对角线
+            (1, -1)   # 左下对角线
+        ]
+        
+        for dr, dc in directions:
+            count = 1  # 当前位置已经有一个棋子
+            
+            # 正向检查
+            r, c = row + dr, col + dc
+            while 0 <= r < self.board_size and 0 <= c < self.board_size and self.board[r][c] == player:
+                count += 1
+                r += dr
+                c += dc
+                
+            # 反向检查
+            r, c = row - dr, col - dc
+            while 0 <= r < self.board_size and 0 <= c < self.board_size and self.board[r][c] == player:
+                count += 1
+                r -= dr
+                c -= dc
+                
+            if count >= 5:
+                return True
+                
+        return False
+    
+    def reset_game(self):
+        """重置游戏"""
+        self.board = [['.' for _ in range(self.board_size)] for _ in range(self.board_size)]
+        self.current_player = 'B'
+        self.game_over = False
+        self.winner = None
+        
+    def run(self):
+        """运行游戏主循环"""
+        clock = pygame.time.Clock()
+        
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        pygame.quit()
+                        sys.exit()
+                    elif event.key == pygame.K_r:
+                        self.reset_game()
+                
+                if event.type == pygame.MOUSEBUTTONDOWN and not self.game_over:
+                    if event.button == 1:  # 左键点击
+                        row, col = self.get_board_position(event.pos)
+                        if row is not None and col is not None:
+                            self.make_move(row, col)
+            
+            # 绘制游戏
+            self.draw_board()
+            self.draw_pieces()
+            self.draw_info()
+            
+            # 更新显示
+            pygame.display.flip()
+            clock.tick(60)
+
+if __name__ == "__main__":
+    game = Gomoku()
+    game.run()
+```
+
+这个 Pygame 版本的五子棋游戏具有以下特点：
+
+1. **图形界面**：使用 Pygame 创建了美观的棋盘界面
+2. **鼠标操作**：玩家可以通过点击鼠标在棋盘上落子
+3. **视觉反馈**：
+   - 不同颜色的棋子（黑色和白色）
+   - 当前玩家指示器
+   - 游戏状态显示
+4. **键盘控制**：
+   - ESC 键退出游戏
+   - R 键重新开始游戏
+5. **游戏逻辑**：保留了原有的五子棋规则和胜负判断
+
+要运行这个游戏，需要先安装 Pygame：
+```
+pip install pygame
+```
+
+游戏界面包括：
+- 传统的 15×15 五子棋棋盘
+- 棋盘上的天元和星位标记
+- 底部显示当前玩家和游戏状态
+- 获胜时会显示获胜方
+
+玩家可以通过鼠标点击棋盘交叉点来落子，游戏会自动判断胜负并显示结果。
+
+> Tokens: 1.7k sent, 2.6k received.  
+> 要运行这个游戏，需要先安装 Pygame：  
+> Create new file? (Y)es/(N)o [Yes]: y  
+> Applied edit to 五子棋.py  
+> Applied edit to 要运行这个游戏，需要先安装 Pygame：  
+> summarizer unexpectedly failed for all models  
